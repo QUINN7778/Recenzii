@@ -6,7 +6,6 @@ SECRET_KEY = 'django-insecure-m_&^%$#@!(*&^%$#@!(*&^%$#@!(*&^%$#@!'
 
 DEBUG = True
 
-# Разрешаем доступ из эмулятора и реальных устройств
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -25,10 +24,11 @@ INSTALLED_APPS = [
     # Твое приложение
     'theatre',
 ]
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # Добавляем для работы статики в облаке
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,12 +37,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# ... остальные настройки ...
+ROOT_URLCONF = 'theatre_api.urls'
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles' # Папка, куда соберутся файлы для Render
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
+TEMPLATES = [
+    {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
         'APP_DIRS': True,
@@ -66,22 +64,21 @@ DATABASES = {
     }
 }
 
-# Настройка REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
     ],
 }
 
-# Настройка CORS
-CORS_ALLOW_ALL_ORIGINS = True # Разрешаем всё для удобства разработки диплома
+CORS_ALLOW_ALL_ORIGINS = True
 
 LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'Europe/Moscow'
-
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
