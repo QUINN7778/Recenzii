@@ -1,0 +1,7 @@
+django
+requests
+beautifulsoup4
+djangorestframework
+django-cors-headers
+gunicorn
+whitenoise
