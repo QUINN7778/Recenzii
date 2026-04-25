@@ -24,6 +24,9 @@ class SettingsViewModel @Inject constructor(
     val themeColorIndex: StateFlow<Int> = repository.themeColorIndex
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    val seedColor: StateFlow<Long> = repository.seedColor
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0xFFB71C1C)
+
     fun setDarkTheme(isDark: Boolean) {
         viewModelScope.launch {
             repository.setDarkTheme(isDark)
@@ -39,6 +42,12 @@ class SettingsViewModel @Inject constructor(
     fun setThemeColor(index: Int) {
         viewModelScope.launch {
             repository.setThemeColor(index)
+        }
+    }
+
+    fun setSeedColor(color: Long) {
+        viewModelScope.launch {
+            repository.setSeedColor(color)
         }
     }
 }

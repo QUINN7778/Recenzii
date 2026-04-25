@@ -10,17 +10,14 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-// Theatre Theme (Red & Gold)
+// Theatre Theme
 val TheatrePrimary = Color(0xFFB71C1C)
-val TheatreSecondary = Color(0xFFFDD835)
-val TheatreTertiary = Color(0xFF7F0000)
 
-// Ocean Theme (Blue)
+// Ocean Theme
 val OceanPrimary = Color(0xFF1976D2)
-val OceanSecondary = Color(0xFF03A9F4)
-val OceanTertiary = Color(0xFF0D47A1)
 
-// Forest Theme (Green)
+// Forest Theme
 val ForestPrimary = Color(0xFF2E7D32)
-val ForestSecondary = Color(0xFF8BC34A)
-val ForestTertiary = Color(0xFF1B5E20)
+
+// Minimal Theme
+val MinimalPrimary = Color(0xFF212121)

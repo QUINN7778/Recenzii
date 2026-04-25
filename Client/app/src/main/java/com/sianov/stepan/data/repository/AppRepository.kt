@@ -19,6 +19,10 @@ class AppRepository @Inject constructor(
     suspend fun getNews(): List<AppItem> = scraper.fetchNews()
     suspend fun getImageBytes(url: String): ByteArray? = scraper.getImageBytes(url)
     
+    fun clearPerformanceCache() {
+        performanceCache.clear()
+    }
+    
     suspend fun getPerformanceDetail(url: String): PerformanceDetail? {
         // Если в кэше уже есть — отдаем мгновенно
         performanceCache[url]?.let { return it }

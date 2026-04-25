@@ -5,3 +5,6 @@ djangorestframework
 django-cors-headers
 gunicorn
 whitenoise
+dj-database-url
+python-dotenv
+psycopg2-binary
