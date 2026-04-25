@@ -158,9 +158,12 @@ class IvMuzScraper @Inject constructor() {
 
     suspend fun fetchPosters(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
+            Log.d("IvMuzScraper", "Fetching posters from: $baseUrl/ticket_online/")
             val doc = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).get()
             val items = mutableListOf<AppItem>()
-            doc.select(".cell.active").forEach { element ->
+            val elements = doc.select(".cell.active")
+            Log.d("IvMuzScraper", "Found ${elements.size} poster elements")
+            elements.forEach { element ->
                 val title = element.select(".name").text().trim()
                 if (title.isNotEmpty()) {
                     val dateStr = "${element.select(".day").text()} ${element.select(".month").text()}, ${element.select(".time").text()}".trim()
@@ -173,7 +176,10 @@ class IvMuzScraper @Inject constructor() {
                 }
             }
             return@withContext items.distinctBy { cleanTitle(it.title) }
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Exception) { 
+            Log.e("IvMuzScraper", "Error fetching posters", e)
+            emptyList() 
+        }
     }
 
     suspend fun fetchNews(): List<AppItem> = withContext(Dispatchers.IO) {

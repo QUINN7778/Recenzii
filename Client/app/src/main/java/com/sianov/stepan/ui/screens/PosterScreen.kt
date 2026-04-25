@@ -74,8 +74,9 @@ fun PosterScreen(
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = if (searchQuery.isNotEmpty()) stringResource(R.string.nothing_found) 
-                               else stringResource(R.string.error_site_unavailable),
+                        text = if (searchQuery.isNotEmpty()) stringResource(R.string.nothing_found)
+                               else "Афиша пуста. Проверьте интернет или Logcat (IvMuzScraper). Найдено элементов: ${posters.size}",
+
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(16.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
