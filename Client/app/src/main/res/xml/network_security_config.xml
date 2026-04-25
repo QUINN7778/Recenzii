@@ -6,8 +6,4 @@
             <certificates src="user" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">onrender.com</domain>
-        <domain includeSubdomains="true">ivmuz.ru</domain>
-    </domain-config>
 </network-security-config>
