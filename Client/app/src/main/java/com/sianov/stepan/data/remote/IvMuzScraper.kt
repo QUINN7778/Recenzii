@@ -11,9 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class IvMuzScraper @Inject constructor(
-    private val apiService: ApiService
-) {
+class IvMuzScraper @Inject constructor() {
     private val baseUrl = "https://www.ivmuz.ru"
     private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
