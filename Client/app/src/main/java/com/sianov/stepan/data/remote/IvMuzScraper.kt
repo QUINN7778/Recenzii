@@ -7,15 +7,22 @@ import com.sianov.stepan.data.model.PerformanceDetail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.select.Elements
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 
 @Singleton
 class IvMuzScraper @Inject constructor() {
     private val baseUrl = "https://www.ivmuz.ru"
     private val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-    // МАКСИМАЛЬНАЯ БАЗА СЮЖЕТОВ (С учетом твоих пожеланий!)
     private val cleanPlots = mapOf(
         "Робин Гуд" to "Легендарная история о защитнике бедных из Шервудского леса. Робин Гуд и его друзья сражаются против тирании шерифа Ноттингема. Вас ждут динамичные бои на мечах, юмор и история любви к прекрасной Мэриан.",
         "Мата Хари" to "Драматический мюзикл о судьбе самой загадочной женщины XX века. История Маргареты Зелле, ставшей легендарной танцовщицей и шпионкой Матой Хари. Опасные игры разведок, роковая страсть и трагический финал великой авантюристки.",
@@ -80,6 +87,20 @@ class IvMuzScraper @Inject constructor() {
         "Дюймовочка" to "Путешествие крошечной девочки по большому миру. Встречи с жабами, жуком, кротом и, наконец, счастливое спасение и встреча с королем эльфов."
     )
 
+    private fun trustAllCertificates() {
+        try {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun getAcceptedIssuers(): Array<X509Certificate>? = null
+                override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
+            })
+            val sc = SSLContext.getInstance("SSL")
+            sc.init(null, trustAllCerts, SecureRandom())
+            javax.net.ssl.HttpsURLConnection.setDefaultSSLSocketFactory(sc.socketFactory)
+            javax.net.ssl.HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
+        } catch (e: Exception) {}
+    }
+
     private fun cleanTitle(title: String): String {
         return title.lowercase()
             .replace(Regex("(мюзикл|оперетта|комедия|сказка|драма|фантазия|детский|спектакль|для детей|по мотивам)"), "")
@@ -96,47 +117,40 @@ class IvMuzScraper @Inject constructor() {
         try {
             if (url.isEmpty()) return@withContext null
             val fullUrl = if (url.startsWith("/")) baseUrl + url else url
-            // Уменьшаем таймаут до 15 секунд для отзывчивости
-            val doc = Jsoup.connect(fullUrl).userAgent(userAgent).timeout(15000).get()
+            val doc: Document = Jsoup.connect(fullUrl).userAgent(userAgent).timeout(20000).validateTLSCertificates(false).get()
             
-            val title = doc.selectFirst("h1, .performance_item_page .title, .title.mobile")?.text()?.trim() ?: ""
+            val title = doc.select("h1").first()?.text()?.trim() ?: ""
             var duration: String? = null
             var author: String? = null
             var acts: String? = null
 
-            // Оптимизируем поиск: ищем только в основных блоках, а не по всему документу
-            doc.select(".performance_item_page p, .performance_item_page div, .performance_item_page span").forEach { el ->
+            val paragraphs: Elements = doc.select(".performance_item_page p, .performance_item_page div")
+            for (el in paragraphs) {
                 val text = el.text().trim()
-                if (text.length > 150) return@forEach // Пропускаем слишком длинные тексты для ускорения
-                
-                if (text.contains("Продолжительность", ignoreCase = true) && duration == null) {
-                    val afterStr = text.substringAfter("родолжительность").replace(":", "").trim()
-                    val timeRegex = Regex("(\\d+\\s*(час\\w*|ч|мин\\w*|м)\\.?\\s*(\\d+\\s*(мин\\w*|м)\\.?)?)")
-                    duration = timeRegex.find(afterStr)?.value?.trim()
-                }
-                if (acts == null && (text.contains("Действие", ignoreCase = true) || text.contains("актах", ignoreCase = true)) && text.length < 40) acts = text
-                if (author == null && (text.startsWith("Музыка") || text.startsWith("Либретто")) && text.length < 150) author = text
+                if (text.contains("Продолжительность", ignoreCase = true)) duration = text.substringAfter(":").trim()
+                if (text.contains("Действие", ignoreCase = true) && text.length < 40) acts = text
+                if ((text.startsWith("Музыка") || text.startsWith("Либретто")) && text.length < 150) author = text
             }
 
             val gallery = mutableListOf<String>()
-            doc.select(".performance_gallery a, a[data-fancybox], .performance_item_page img").forEach { el ->
-                if (el.parents().any { it.hasClass("action_person") || it.hasClass("unit_actor") }) return@forEach
-                var img = if (el.tagName() == "a") el.attr("href") else el.attr("src")
+            val imgs: Elements = doc.select(".performance_item_page img")
+            for (el in imgs) {
+                if (el.parents().any { it.hasClass("action_person") || it.hasClass("unit_actor") }) continue
+                var img = el.attr("src")
                 if (img.isNotEmpty()) {
                     if (img.startsWith("/")) img = baseUrl + img
-                    if (!gallery.contains(img) && !img.contains("logo") && !img.contains("icon")) gallery.add(img)
+                    if (!gallery.contains(img)) gallery.add(img)
                 }
             }
 
             val cast = mutableListOf<CastMember>()
-            val honorificsRegex = Regex("(?i)\\b(заслуженн|народн|артист|вокал|работник|лауреат|преми|почетн|рф|ссср|мастер|сцены|балета|хора|драмы|солист)\\w*\\b")
-            doc.select(".action_person").forEach { pb ->
-                val role = pb.select(".personage").text().trim().split(",", "(", "—", ".").firstOrNull()?.trim()
-                    ?.replace(honorificsRegex, "")?.replace(Regex("\\s+"), " ")?.trim() ?: ""
-                pb.select(".unit_actor").forEach { ab ->
-                    val name = ab.select(".name").text().trim().split(",", "(", "—").firstOrNull()?.trim()
-                        ?.replace(honorificsRegex, "")?.replace(Regex("\\s+"), " ")?.trim() ?: ""
-                    var img = ab.select("img").attr("src")
+            val personBlocks: Elements = doc.select(".action_person")
+            for (pb in personBlocks) {
+                val role = pb.select(".personage").first()?.text()?.trim() ?: ""
+                val actors: Elements = pb.select(".unit_actor")
+                for (ab in actors) {
+                    val name = ab.select(".name").first()?.text()?.trim() ?: ""
+                    var img = ab.select("img").first()?.attr("src") ?: ""
                     if (img.isNotEmpty() && img.startsWith("/")) img = baseUrl + img
                     if (role.isNotEmpty() && name.isNotEmpty()) cast.add(CastMember(role, name, img.ifEmpty { null }))
                 }
@@ -158,52 +172,46 @@ class IvMuzScraper @Inject constructor() {
 
     suspend fun fetchPosters(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
-            Log.d("IvMuzScraper", "Fetching posters from: $baseUrl/ticket_online/")
-            val doc = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).get()
+            trustAllCertificates()
+            val doc: Document = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).validateTLSCertificates(false).get()
             val items = mutableListOf<AppItem>()
-            val elements = doc.select(".cell.active")
-            Log.d("IvMuzScraper", "Found ${elements.size} poster elements")
-            elements.forEach { element ->
+            val elements: Elements = doc.select(".cell.active")
+            for (element in elements) {
                 val title = element.select(".name").text().trim()
                 if (title.isNotEmpty()) {
-                    val dateStr = "${element.select(".day").text()} ${element.select(".month").text()}, ${element.select(".time").text()}".trim()
-                    val style = element.select(".performance_unit").attr("style")
+                    val dateStr = "${element.select(".day").text()} ${element.select(".month").text()}".trim()
+                    val style = element.select(".performance_unit").first()?.attr("style") ?: ""
                     var img = if (style.contains("url(")) style.substringAfter("url(").substringBefore(")").trim('\'', '"') else ""
                     if (img.startsWith("/")) img = baseUrl + img
-                    var url = element.select("a").attr("href").ifEmpty { element.select(".name a").attr("href") }
+                    var url = element.select("a").first()?.attr("href") ?: ""
                     if (url.startsWith("/")) url = baseUrl + url
                     items.add(AppItem(title, "", dateStr, img, url))
                 }
             }
             return@withContext items.distinctBy { cleanTitle(it.title) }
-        } catch (e: Exception) { 
-            Log.e("IvMuzScraper", "Error fetching posters", e)
-            emptyList() 
-        }
+        } catch (e: Exception) { emptyList() }
     }
 
     suspend fun fetchNews(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
-            val doc = Jsoup.connect("$baseUrl/news/").userAgent(userAgent).timeout(20000).get()
+            val doc: Document = Jsoup.connect("$baseUrl/news/").userAgent(userAgent).timeout(20000).validateTLSCertificates(false).get()
             val items = mutableListOf<AppItem>()
-            // Ищем новости именно в блоке контента, если он есть, или фильтруем .cell
-            doc.select(".cell").forEach { element ->
+            val cells: Elements = doc.select(".cell")
+            for (element in cells) {
                 val title = element.select(".text").text().ifEmpty { element.select("a").text() }.trim()
                 val date = element.select(".date").text().trim()
-                
-                // Фильтруем: новость должна иметь заголовок и дату, 
-                // и не должна начинаться с технических индексов (00, 01 и т.д.)
-                if (title.isNotEmpty() && date.isNotEmpty() && !title.matches(Regex("^\\d{2}.*"))) {
-                    var img = element.select("img").attr("src")
+                if (title.isNotEmpty() && date.isNotEmpty()) {
+                    var img = element.select("img").first()?.attr("src") ?: ""
                     if (img.startsWith("/")) img = baseUrl + img
-                    items.add(AppItem(title, "", date, img))
+                    items.append(AppItem(title, "", date, img, ""))
                 }
             }
             return@withContext items
         } catch (e: Exception) { emptyList() }
     }
+    
+    // Вспомогательная функция для добавления в список (в Kotlin это add)
+    private fun MutableList<AppItem>.append(item: AppItem) { this.add(item) }
 
-    suspend fun getImageBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
-        try { Jsoup.connect(if (url.startsWith("/")) baseUrl + url else url).userAgent(userAgent).ignoreContentType(true).execute().bodyAsBytes() } catch (e: Exception) { null }
-    }
+    suspend fun getImageBytes(url: String): ByteArray? = null
 }
