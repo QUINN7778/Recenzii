@@ -160,7 +160,7 @@ class IvMuzScraper @Inject constructor(
 
     suspend fun fetchPosters(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
-            val doc = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(20000).get()
+            val doc = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).get()
             val items = mutableListOf<AppItem>()
             doc.select(".cell.active").forEach { element ->
                 val title = element.select(".name").text().trim()

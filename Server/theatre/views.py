@@ -6,109 +6,16 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from .models import Performance, Review
-import requests
-from bs4 import BeautifulSoup
-import re
-
-BASE_URL = "https://www.ivmuz.ru"
-
-def clean_title(title):
-    t = title.lower()
-    t = re.sub(r'(мюзикл|оперетта|комедия|сказка|драма|фантазия|детский|спектакль|для детей|по мотивам)', '', t)
-    t = re.sub(r'[^а-яa-z0-9]', '', t)
-    return t.strip()
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_posters(request):
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        }
-        response = requests.get(f"{BASE_URL}/ticket_online/", headers=headers, timeout=20)
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        items = []
-        for element in soup.select(".cell.active"):
-            title_el = element.select_one(".name")
-            if title_el:
-                title = title_el.text.strip()
-                day = element.select_one(".day").text.strip() if element.select_one(".day") else ""
-                month = element.select_one(".month").text.strip() if element.select_one(".month") else ""
-                time = element.select_one(".time").text.strip() if element.select_one(".time") else ""
-                date_str = f"{day} {month}, {time}".strip()
-                
-                style = element.select_one(".performance_unit")['style'] if element.select_one(".performance_unit") else ""
-                img = ""
-                if "url(" in style:
-                    img = style.split("url(")[1].split(")")[0].strip("'\"")
-                if img.startswith("/"):
-                    img = BASE_URL + img
-                
-                url = ""
-                link_el = element.select_one("a")
-                if link_el:
-                    url = link_el['href']
-                if url.startswith("/"):
-                    url = BASE_URL + url
-                
-                items.append({
-                    "title": title,
-                    "description": "",
-                    "date": date_str,
-                    "imageUrl": img,
-                    "detailUrl": url
-                })
-        
-        # Убираем дубликаты по названию
-        unique_items = []
-        seen_titles = set()
-        for item in items:
-            clean = clean_title(item['title'])
-            if clean not in seen_titles:
-                unique_items.append(item)
-                seen_titles.add(clean)
-                
-        return JsonResponse(unique_items, safe=False)
-    except Exception as e:
-        return JsonResponse([], safe=False)
+    return JsonResponse([], safe=False)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_news(request):
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(f"{BASE_URL}/news/", headers=headers, timeout=15)
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        items = []
-        for element in soup.select(".cell"):
-            text_el = element.select_one(".text")
-            if not text_el:
-                text_el = element.select_one("a")
-            
-            title = text_el.text.strip() if text_el else ""
-            date_el = element.select_one(".date")
-            date = date_el.text.strip() if date_el else ""
-            
-            if title and date and not re.match(r'^\d{2}.*', title):
-                img_el = element.select_one("img")
-                img = img_el['src'] if img_el else ""
-                if img.startswith("/"):
-                    img = BASE_URL + img
-                
-                items.append({
-                    "title": title,
-                    "description": "",
-                    "date": date,
-                    "imageUrl": img,
-                    "detailUrl": ""
-                })
-        return JsonResponse(items, safe=False)
-    except Exception as e:
-        return JsonResponse([], safe=False)
+    return JsonResponse([], safe=False)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -168,45 +75,23 @@ def sync_performance(request):
             'description': request.data.get('description', ''),
         }
     )
-    
     return Response({'status': 'synced', 'created': created})
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny]) 
 def performance_reviews(request):
     url = request.query_params.get('url')
-    
     if request.method == 'GET':
-        if not url:
-            return Response({'error': 'URL is required'}, status=400)
-        
+        if not url: return Response({'error': 'URL is required'}, status=400)
         reviews = Review.objects.filter(performance__url=url)
-        data = []
-        for r in reviews:
-            data.append({
-                'username': r.user.username,
-                'rating': r.rating,
-                'comment': r.comment,
-                'date': r.created_at.strftime('%d.%m.%Y')
-            })
+        data = [{'username': r.user.username, 'rating': r.rating, 'comment': r.comment, 'date': r.created_at.strftime('%d.%m.%Y')} for r in reviews]
         return Response(data)
-    
     elif request.method == 'POST':
-        if not request.user.is_authenticated:
-            return Response({'error': 'Authentication required'}, status=401)
-            
+        if not request.user.is_authenticated: return Response({'error': 'Authentication required'}, status=401)
         url = request.data.get('url')
-        rating = request.data.get('rating', 5)
-        comment = request.data.get('comment', '')
-        
         try:
             performance = Performance.objects.get(url=url)
+            review, created = Review.objects.update_or_create(user=request.user, performance=performance, defaults={'rating': request.data.get('rating', 5), 'comment': request.data.get('comment', '')})
+            return Response({'status': 'saved', 'created': created})
         except Performance.DoesNotExist:
             return Response({'error': 'Performance not synced yet'}, status=400)
-            
-        review, created = Review.objects.update_or_create(
-            user=request.user,
-            performance=performance,
-            defaults={'rating': rating, 'comment': comment}
-        )
-        return Response({'status': 'saved', 'created': created})
