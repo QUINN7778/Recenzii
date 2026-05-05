@@ -27,6 +27,7 @@ fun SettingsScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsState(initial = false)
     val fontSizeMultiplier by viewModel.fontSizeMultiplier.collectAsState(initial = 1.0f)
     val themeColorIndex by viewModel.themeColorIndex.collectAsState(initial = 0)
+    val dynamicColor by viewModel.dynamicColor.collectAsState(initial = false)
     val user by authViewModel.user.collectAsState()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
@@ -41,7 +42,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Единый стиль карточек для всех разделов
             val cardShape = RoundedCornerShape(16.dp)
             val cardModifier = Modifier.fillMaxWidth()
 
@@ -72,23 +72,32 @@ fun SettingsScreen(
                         Switch(checked = isDarkTheme ?: false, onCheckedChange = { viewModel.setDarkTheme(it) })
                     }
                     Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Palette, null)
+                        Spacer(Modifier.width(16.dp))
+                        Text("Динамические цвета", Modifier.weight(1f))
+                        Switch(checked = dynamicColor, onCheckedChange = { viewModel.setDynamicColor(it) })
+                    }
+                    Spacer(Modifier.height(16.dp))
                     Text("Размер шрифта: ${(fontSizeMultiplier * 100).toInt()}%")
                     Slider(value = fontSizeMultiplier, onValueChange = { viewModel.setFontSize(it) }, valueRange = 0.8f..1.4f, steps = 5)
                 }
             }
 
             // 3. Цветовой стиль
-            SettingsSection("Цветовой стиль")
-            Card(shape = cardShape, modifier = cardModifier) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    val themes = listOf("Стандарт", "Театральный", "Океан", "Лесной", "Минимализм")
-                    themes.forEachIndexed { index, name ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable { viewModel.setThemeColor(index) }.padding(8.dp)
-                        ) {
-                            RadioButton(selected = themeColorIndex == index, onClick = { viewModel.setThemeColor(index) })
-                            Text(name)
+            if (!dynamicColor) {
+                SettingsSection("Цветовой стиль")
+                Card(shape = cardShape, modifier = cardModifier) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        val themes = listOf("Стандарт", "Театральный", "Океан", "Лесной", "Минимализм")
+                        themes.forEachIndexed { index, name ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { viewModel.setThemeColor(index) }.padding(8.dp)
+                            ) {
+                                RadioButton(selected = themeColorIndex == index, onClick = { viewModel.setThemeColor(index) })
+                                Text(name)
+                            }
                         }
                     }
                 }

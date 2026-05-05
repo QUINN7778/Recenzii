@@ -24,6 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.sianov.stepan.data.model.CastMember
 import com.sianov.stepan.data.model.ReviewResponse
@@ -52,9 +55,8 @@ fun PerformanceDetailScreen(
     val visited by authViewModel.visited.collectAsState()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
-    var currentMainImageUrl by remember(detail) { 
-        mutableStateOf(detail?.imageUrl ?: "") 
-    }
+    // Настройка пейджера для свайпов
+    val pagerState = rememberPagerState(pageCount = { detail?.galleryImages?.size ?: 1 })
 
     // Состояние для написания отзыва
     var showReviewDialog by remember { mutableStateOf(false) }
@@ -128,42 +130,42 @@ fun PerformanceDetailScreen(
                         .background(MaterialTheme.colorScheme.surface)
                 ) {
                     item {
-                        // 1. ГЛАВНАЯ КАРТИНКА
-                        Card(
+                        // 1. ГЛАВНАЯ КАРТИНКА (ТЕПЕРЬ СВАЙПАЕТСЯ)
+                        val images = performance.galleryImages.ifEmpty { listOf(performance.imageUrl) }
+                        val coroutineScope = rememberCoroutineScope()
+
+                        HorizontalPager(
+                            state = pagerState,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(4.dp)
-                        ) {
-                            NetworkImage(
-                                url = currentMainImageUrl.ifEmpty { performance.imageUrl },
-                                repository = viewModel.repository,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f),
-                                contentScale = ContentScale.Crop
-                            )
+                                .padding(16.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        ) { page ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(4.dp)
+                            ) {
+                                NetworkImage(
+                                    url = images[page],
+                                    repository = viewModel.repository,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         }
 
                         Column(Modifier.padding(horizontal = 16.dp)) {
-                            // Название и Автор
+                            // 2. ЗАГОЛОВОК (СНИЗУ, КРУПНЫЙ)
+                            Spacer(Modifier.height(8.dp))
                             Text(
                                 text = performance.title,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 38.sp
                             )
-                            
-                            if (!performance.author.isNullOrEmpty()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = performance.author!!,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    fontStyle = FontStyle.Italic
-                                )
-                            }
 
                             // ACTION BUTTONS ROW
                             Spacer(Modifier.height(16.dp))
@@ -203,7 +205,7 @@ fun PerformanceDetailScreen(
                                 )
                             }
 
-                            // 2. ГАЛЕРЕЯ
+                            // 2. ГАЛЕРЕЯ (СИНХРОНИЗИРОВАНА С ПЕЙДЖЕРОМ)
                             if (performance.galleryImages.isNotEmpty()) {
                                 Spacer(Modifier.height(24.dp))
                                 Text(
@@ -216,14 +218,19 @@ fun PerformanceDetailScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     contentPadding = PaddingValues(end = 16.dp)
                                 ) {
-                                    items(performance.galleryImages) { img ->
+                                    items(performance.galleryImages.size) { index ->
+                                        val img = performance.galleryImages[index]
                                         Card(
                                             modifier = Modifier
                                                 .width(140.dp)
                                                 .height(90.dp)
-                                                .clickable { currentMainImageUrl = img },
+                                                .clickable { 
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(index)
+                                                    }
+                                                },
                                             shape = RoundedCornerShape(12.dp),
-                                            border = if (currentMainImageUrl == img) 
+                                            border = if (pagerState.currentPage == index) 
                                                 BorderStroke(3.dp, MaterialTheme.colorScheme.primary) 
                                                 else null,
                                             elevation = CardDefaults.cardElevation(2.dp)
@@ -285,14 +292,15 @@ fun PerformanceDetailScreen(
                             }
 
                             // 5. АКТЕРЫ
+                            Spacer(Modifier.height(32.dp))
+                            Text(
+                                text = "Действующие лица и исполнители",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            
                             if (performance.cast.isNotEmpty()) {
-                                Spacer(Modifier.height(32.dp))
-                                Text(
-                                    text = "Действующие лица и исполнители",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(Modifier.height(16.dp))
                                 LazyRow(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     contentPadding = PaddingValues(end = 16.dp)
@@ -300,6 +308,20 @@ fun PerformanceDetailScreen(
                                     items(performance.cast) { actor ->
                                         CastMemberCard(actor, viewModel.repository)
                                     }
+                                }
+                            } else {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "Состав исполнителей временно недоступен",
+                                        modifier = Modifier.padding(16.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
 

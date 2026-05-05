@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
             val isDarkThemePref by settingsViewModel.isDarkTheme.collectAsState(initial = false)
             val fontSizeMultiplier by settingsViewModel.fontSizeMultiplier.collectAsState(initial = 1.0f)
             val themeColorIndex by settingsViewModel.themeColorIndex.collectAsState(initial = 0)
+            val dynamicColor by settingsViewModel.dynamicColor.collectAsState(initial = false)
             val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
             val darkTheme = isDarkThemePref ?: androidx.compose.foundation.isSystemInDarkTheme()
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
             ForStepanTheme(
                 darkTheme = darkTheme,
+                dynamicColor = dynamicColor,
                 fontSizeMultiplier = fontSizeMultiplier,
                 themeColorIndex = themeColorIndex
             ) {

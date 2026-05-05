@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.sianov.stepan"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.sianov.stepan"
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -42,7 +42,7 @@ android {
         viewBinding = true
         buildConfig = true
     }
-    buildToolsVersion = "36.0.0"
+    buildToolsVersion = "35.0.0"
 }
 
 dependencies {
@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.coil.compose)
     
     // Navigation
     implementation(libs.androidx.navigation.compose)
@@ -77,4 +78,9 @@ dependencies {
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.converter.scalars)
     implementation(libs.retrofit.converter.gson)
+
+    // Room Components
+    implementation(libs.room.runtime)
+    ksp(libs.room.compiler) // Using KSP for Room compiler
+    implementation(libs.room.ktx) // Kotlin Extensions for Room
 }

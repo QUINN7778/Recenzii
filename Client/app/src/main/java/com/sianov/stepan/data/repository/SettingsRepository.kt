@@ -21,11 +21,13 @@ class SettingsRepository @Inject constructor(
     private val darkThemeKey = booleanPreferencesKey("dark_theme")
     private val fontSizeKey = floatPreferencesKey("font_size")
     private val themeColorKey = intPreferencesKey("theme_color")
+    private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
     private val seedColorKey = androidx.datastore.preferences.core.longPreferencesKey("seed_color")
 
     val isDarkTheme: Flow<Boolean?> = context.dataStore.data.map { it[darkThemeKey] }
     val fontSizeMultiplier: Flow<Float> = context.dataStore.data.map { it[fontSizeKey] ?: 1.0f }
     val themeColorIndex: Flow<Int> = context.dataStore.data.map { it[themeColorKey] ?: 0 }
+    val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[dynamicColorKey] ?: false }
     val seedColor: Flow<Long> = context.dataStore.data.map { it[seedColorKey] ?: 0xFFB71C1C }
 
     suspend fun setDarkTheme(isDark: Boolean) {
@@ -38,6 +40,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setThemeColor(index: Int) {
         context.dataStore.edit { it[themeColorKey] = index }
+    }
+
+    suspend fun setDynamicColor(enabled: Boolean) {
+        context.dataStore.edit { it[dynamicColorKey] = enabled }
     }
 
     suspend fun setSeedColor(color: Long) {

@@ -38,6 +38,8 @@ class IvMuzScraper @Inject constructor() {
         "Бесприданница" to "Драма по пьесе А. Островского. Трагическая судьба Ларисы Огудаловой в мире, где чувства приносятся в жертву деньгам. Пронзительная история о любви и разочаровании.",
         "Ханума" to "Веселая комедия о соперничестве двух свах в старинном Тбилиси. Музыка, танцы и кавказский колорит помогут соединить сердца молодых влюбленных вопреки воле старого князя.",
         "12 стульев" to "Музыкальное приключение Остапа Бендера и Кисы Воробьянинова в поисках бриллиантов мадам Петуховой. Искрометный юмор Ильфа и Петрова в яркой музыкальной постановке.",
+        "Не в стульях счастье" to "Оригинальное музыкальное прочтение бессмертного романа Ильфа и Петрова. История Остапа Бендера и Кисы Воробьянинова, которые в поисках сокровищ мадам Петуховой попадают в череду невероятных и комичных ситуаций.",
+        "Капитанская дочка" to "Драматический мюзикл по повести А.С. Пушкина. История Петра Гринева и Маши Мироновой, разворачивающаяся на фоне грозных событий пугачевского бунта. Рассказ о чести, верности долгу и всепобеждающей любви.",
         "Три мушкетера" to "Мюзикл о дружбе, чести и отваге. Д'Артаньян и его верные друзья Атос, Портос и Арамис спасают честь королевы Франции, сражаясь с интригами кардинала Ришелье.",
         "Дон Сезар де Базан" to "Героическая комедия об обедневшем, но благородном испанском дворянине. История о чести, любви и о том, как находчивость помогает выйти победителем из самых сложных ситуаций.",
         "Марица" to "Великолепная оперетта Имре Кальмана. История любви гордой графини Марицы и ее управляющего, скрывающего свое знатное происхождение. Страстные венгерские танцы и мелодии.",
@@ -84,7 +86,10 @@ class IvMuzScraper @Inject constructor() {
         "Морозко" to "Зимняя сказка о доброй Настеньке, которую мачеха отправила в лес, и о мудром дедушке Морозко, наградившем ее за терпение и кротость.",
         "Кошкин дом" to "Поучительная сказка о богатой Кошке, которая в беде осталась одна, и только бедные племянники-котята открыли ей дверь своего маленького дома.",
         "Белоснежка" to "Классическая история о прекрасной принцессе, семи добрых гномах и злой королеве. Сказка о том, что истинная красота и доброта всегда побеждают зависть.",
-        "Дюймовочка" to "Путешествие крошечной девочки по большому миру. Встречи с жабами, жуком, кротом и, наконец, счастливое спасение и встреча с королем эльфов."
+        "Дюймовочка" to "Путешествие крошечной девочки по большому миру. Встречи с жабами, жуком, кротом и, наконец, счастливое спасение и встреча с королем эльфов.",
+        "Каприз императрицы" to "Увлекательная музыкальная комедия, действие которой происходит в блестящую эпоху правления Елизаветы Петровны. Вас ждут придворные интриги, юмор и, конечно, любовь.",
+        "Царевна-лягушка" to "Веселая музыкальная сказка для всей семьи. История о том, как Иван-царевич нашел свое счастье в болоте, и о том, что истинная красота скрыта внутри. Яркие костюмы и любимые герои.",
+        "Принцесса на горошине" to "Волшебная сказка о настоящей принцессе, которая смогла почувствовать маленькую горошину через двенадцать матрасов. Музыкальная история о благородстве и искренности."
     )
 
     private fun trustAllCertificates() {
@@ -113,53 +118,178 @@ class IvMuzScraper @Inject constructor() {
         return entry?.value ?: "Погрузитесь в атмосферу высокого искусства вместе с артистами Ивановского музыкального театра. Вас ждет захватывающий сюжет, великолепные вокальные партии и яркие декорации."
     }
 
+    private val knownDurations = mapOf(
+        "Анна Каренина" to "2 часа 20 минут",
+        "Капитанская дочка" to "2 часа 20 минут",
+        "Робин Гуд" to "2 часа 20 минут",
+        "Сильва" to "2 часа 30 минут",
+        "Не в стульях счастье" to "2 часа 30 минут",
+        "Полнолуние" to "2 часа 40 минут",
+        "Каприз Императрицы" to "2 часа 30 минут",
+        "Царевна-Лягушка" to "1 час",
+        "Принцесса на горошине" to "1 час",
+        "Летучая мышь" to "2 часа 30 минут",
+        "Мистер Икс" to "2 часа 30 минут",
+        "Ханума" to "2 часа 20 минут",
+        "Джейн Эйр" to "2 часа 30 минут",
+        "Алые паруса" to "2 часа 15 минут",
+        "Фантом" to "2 часа 30 минут",
+        "Три мушкетера" to "2 часа 30 минут"
+    )
+
+    private fun getDurationByTitle(title: String): String? {
+        val cleaned = cleanTitle(title)
+        return knownDurations.entries.find { 
+            val k = cleanTitle(it.key)
+            k.contains(cleaned) || cleaned.contains(k) 
+        }?.value
+    }
+
+    private fun extractPlot(doc: Document, title: String): String {
+        // 1. Пробуем найти текст описания на странице
+        val descriptionElements = doc.select(".performance_item_page p, .performance_unit_page p, .description p, .text_content p")
+        val extracted = descriptionElements
+            .map { it.text().trim() }
+            .filter { 
+                it.length > 40 && 
+                !it.contains("Режиссер", ignoreCase = true) && 
+                !it.contains("Музыка", ignoreCase = true) &&
+                !it.contains("Продолжительность", ignoreCase = true) &&
+                !it.contains("Либретто", ignoreCase = true) &&
+                !it.contains("Балетмейстер", ignoreCase = true) &&
+                !it.contains("Художник", ignoreCase = true)
+            }
+            .joinToString("\n\n")
+            .trim()
+
+        if (extracted.isNotEmpty() && extracted.length > 150) {
+            return extracted.take(2000)
+        }
+
+        // 2. Если на странице пусто или текст технический — берем из нашей базы
+        return getPlotByTitle(title)
+    }
+
     suspend fun fetchPerformanceDetail(url: String): PerformanceDetail? = withContext(Dispatchers.IO) {
         try {
             if (url.isEmpty()) return@withContext null
             val fullUrl = if (url.startsWith("/")) baseUrl + url else url
-            val doc: Document = Jsoup.connect(fullUrl).userAgent(userAgent).timeout(20000).validateTLSCertificates(false).get()
+            val doc: Document = Jsoup.connect(fullUrl).userAgent(userAgent).timeout(20000).get()
             
-            val title = doc.select("h1").first()?.text()?.trim() ?: ""
+            val title = doc.select(".title.mobile").first()?.text()?.trim()
+                ?: doc.select("nav.breadcrumbs span").last()?.text()?.trim()
+                ?: doc.select("h1").first()?.text()?.trim()
+                ?: doc.title().replace("- Ивановский музыкальный театр", "").trim()
+            
             var duration: String? = null
             var author: String? = null
             var acts: String? = null
 
-            val paragraphs: Elements = doc.select(".performance_item_page p, .performance_item_page div")
-            for (el in paragraphs) {
+            // 1. Поиск продолжительности через элементы
+            val infoElements = doc.select(".performance_item_page b, .performance_item_page strong, .performance_info b")
+            for (el in infoElements) {
                 val text = el.text().trim()
-                if (text.contains("Продолжительность", ignoreCase = true)) duration = text.substringAfter(":").trim()
-                if (text.contains("Действие", ignoreCase = true) && text.length < 40) acts = text
-                if ((text.startsWith("Музыка") || text.startsWith("Либретто")) && text.length < 150) author = text
+                if (text.contains("Продолжительность", ignoreCase = true)) {
+                    val fullText = el.parent()?.text() ?: ""
+                    if (!fullText.contains("антракт", ignoreCase = true)) {
+                        val match = Regex("(\\d+\\s*час[а-я]*\\s*\\d*\\s*мин[а-я]*|\\d+\\s*час[а-я]*)").find(fullText)
+                        duration = match?.value?.trim()
+                    }
+                }
+            }
+
+            // 2. Поиск через регулярку по всему тексту (самый надежный способ для этого сайта)
+            if (duration.isNullOrEmpty()) {
+                val pageText = doc.text()
+                // Ищем конструкцию: "Продолжительность" + (не более 30 символов) + "час/мин"
+                val match = Regex("(?i)Продолжительность[^\\d]{0,30}(\\d+\\s*час[а-я]*\\s*\\d*\\s*мин[а-я]*|\\d+\\s*час[а-я]*)").find(pageText)
+                duration = match?.groupValues?.get(1)?.trim()
+            }
+
+            // 3. Если всё еще пусто — берем из базы
+            if (duration.isNullOrEmpty()) {
+                duration = getDurationByTitle(title)
+            }
+            
+            if (duration.isNullOrEmpty()) duration = "уточняется"
+
+            // Сбор остальных данных
+            val allElements = doc.select(".performance_item_page *, .performance_unit_page *")
+            for (el in allElements) {
+                val text = el.text().trim()
+                if (text.contains("Действие", ignoreCase = true) && text.length < 60 && acts == null) {
+                    acts = text
+                }
+                if ((text.startsWith("Музыка") || text.startsWith("Либретто") || text.startsWith("Режиссер")) && text.length < 150 && author == null) {
+                    author = text
+                }
             }
 
             val gallery = mutableListOf<String>()
-            val imgs: Elements = doc.select(".performance_item_page img")
-            for (el in imgs) {
-                if (el.parents().any { it.hasClass("action_person") || it.hasClass("unit_actor") }) continue
-                var img = el.attr("src")
-                if (img.isNotEmpty()) {
+            // Приоритетно собираем ссылки на большие фото (из <a> тегов)
+            val highResElements = doc.select("a.fancybox, a[href*=.jpg], a[href*=.png], .gallery a")
+            for (el in highResElements) {
+                var img = el.attr("href").trim()
+                val isPushkin = img.contains("pushkin", ignoreCase = true) || 
+                               el.attr("title").contains("пушкин", ignoreCase = true) ||
+                               el.select("img").attr("alt").contains("пушкин", ignoreCase = true)
+
+                if (img.isNotEmpty() && !isPushkin) {
                     if (img.startsWith("/")) img = baseUrl + img
                     if (!gallery.contains(img)) gallery.add(img)
                 }
             }
 
+            // Добираем картинки, которых еще нет (но фильтруем явные иконки и Пушкинскую карту)
+            val imgElements = doc.select(".performance_item_page img, .performance_unit img, .main_image img, .gallery img")
+            for (el in imgElements) {
+                if (el.parents().any { it.hasClass("action_person") || it.hasClass("unit_actor") }) continue
+                
+                var img = el.attr("src").ifEmpty { el.attr("data-src") }.trim()
+                val isPushkin = img.contains("pushkin", ignoreCase = true) || 
+                               el.attr("alt").contains("пушкин", ignoreCase = true) ||
+                               el.attr("title").contains("пушкин", ignoreCase = true)
+
+                if (img.isNotEmpty() && !isPushkin) {
+                    if (img.startsWith("/")) img = baseUrl + img
+                    // Если это явно превью (содержит /thumb/ или маленькие размеры в имени), пропускаем, если уже есть что-то другое
+                    val isThumb = img.contains("/thumb/") || img.contains("_s.") || img.contains("-150x150")
+                    if (isThumb && gallery.isNotEmpty()) continue
+                    
+                    if (!gallery.contains(img)) gallery.add(img)
+                }
+            }
+
             val cast = mutableListOf<CastMember>()
-            val personBlocks: Elements = doc.select(".action_person")
+            // Улучшенный поиск актёров (включая таблицы и списки)
+            val personBlocks: Elements = doc.select(".action_person, .unit_actor, .performance_cast tr, .actors_list li")
             for (pb in personBlocks) {
-                val role = pb.select(".personage").first()?.text()?.trim() ?: ""
-                val actors: Elements = pb.select(".unit_actor")
-                for (ab in actors) {
-                    val name = ab.select(".name").first()?.text()?.trim() ?: ""
-                    var img = ab.select("img").first()?.attr("src") ?: ""
-                    if (img.isNotEmpty() && img.startsWith("/")) img = baseUrl + img
-                    if (role.isNotEmpty() && name.isNotEmpty()) cast.add(CastMember(role, name, img.ifEmpty { null }))
+                if (pb.hasClass("action_person")) {
+                    val role = pb.select(".personage").first()?.text()?.trim() ?: ""
+                    val actors: Elements = pb.select(".unit_actor")
+                    for (ab in actors) {
+                        val name = ab.select(".name").first()?.text()?.trim() ?: ""
+                        var img = ab.select("img").first()?.attr("src") ?: ""
+                        if (img.isNotEmpty() && img.startsWith("/")) img = baseUrl + img
+                        if (role.isNotEmpty() && name.isNotEmpty()) cast.add(CastMember(role, name, img.ifEmpty { null }))
+                    }
+                } else if (pb.tagName() == "tr") {
+                    // Обработка табличной верстки (бывает на некоторых страницах)
+                    val tds = pb.select("td")
+                    if (tds.size >= 2) {
+                        val role = tds[0].text().trim()
+                        val name = tds[1].text().trim()
+                        if (role.isNotEmpty() && name.isNotEmpty() && !role.contains("Действующее лицо")) {
+                            cast.add(CastMember(role, name, null))
+                        }
+                    }
                 }
             }
 
             return@withContext PerformanceDetail(
                 title = title,
                 imageUrl = gallery.firstOrNull() ?: "",
-                description = getPlotByTitle(title),
+                description = extractPlot(doc, title),
                 cast = cast.distinctBy { "${it.role}:${it.name}" },
                 detailUrl = url,
                 galleryImages = gallery,
@@ -173,13 +303,16 @@ class IvMuzScraper @Inject constructor() {
     suspend fun fetchPosters(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
             trustAllCertificates()
-            val doc: Document = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).validateTLSCertificates(false).get()
+            val doc: Document = Jsoup.connect("$baseUrl/ticket_online/").userAgent(userAgent).timeout(30000).get()
             val items = mutableListOf<AppItem>()
             val elements: Elements = doc.select(".cell.active")
             for (element in elements) {
                 val title = element.select(".name").text().trim()
                 if (title.isNotEmpty()) {
-                    val dateStr = "${element.select(".day").text()} ${element.select(".month").text()}".trim()
+                    val day = element.select(".day").text().trim()
+                    val month = element.select(".month").text().trim()
+                    val time = element.select(".time").text().trim()
+                    val dateStr = if (time.isNotEmpty()) "$day $month, $time" else "$day $month"
                     val style = element.select(".performance_unit").first()?.attr("style") ?: ""
                     var img = if (style.contains("url(")) style.substringAfter("url(").substringBefore(")").trim('\'', '"') else ""
                     if (img.startsWith("/")) img = baseUrl + img
@@ -194,24 +327,40 @@ class IvMuzScraper @Inject constructor() {
 
     suspend fun fetchNews(): List<AppItem> = withContext(Dispatchers.IO) {
         try {
-            val doc: Document = Jsoup.connect("$baseUrl/news/").userAgent(userAgent).timeout(20000).validateTLSCertificates(false).get()
+            val doc: Document = Jsoup.connect("$baseUrl/news/").userAgent(userAgent).timeout(20000).get()
             val items = mutableListOf<AppItem>()
             val cells: Elements = doc.select(".cell")
             for (element in cells) {
                 val title = element.select(".text").text().ifEmpty { element.select("a").text() }.trim()
                 val date = element.select(".date").text().trim()
                 if (title.isNotEmpty() && date.isNotEmpty()) {
-                    var img = element.select("img").first()?.attr("src") ?: ""
+                    // Улучшенный поиск картинки в новостях
+                    var img = element.select("img").first()?.attr("src") 
+                        ?: element.select(".image img").attr("src")
+                        ?: ""
+                    
                     if (img.startsWith("/")) img = baseUrl + img
-                    items.append(AppItem(title, "", date, img, ""))
+                    items.add(AppItem(title, "", date, img, ""))
                 }
             }
             return@withContext items
         } catch (e: Exception) { emptyList() }
     }
-    
-    // Вспомогательная функция для добавления в список (в Kotlin это add)
-    private fun MutableList<AppItem>.append(item: AppItem) { this.add(item) }
 
-    suspend fun getImageBytes(url: String): ByteArray? = null
+    suspend fun getImageBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            if (url.isEmpty()) return@withContext null
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+            connection.doInput = true
+            connection.connect()
+            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                return@withContext connection.inputStream.readBytes()
+            }
+        } catch (e: Exception) {
+            Log.e("IvMuzScraper", "Error fetching image from $url: ${e.message}")
+        }
+        null
+    }
 }

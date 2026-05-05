@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sianov.stepan.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -21,8 +22,11 @@ class SettingsViewModel @Inject constructor(
     val fontSizeMultiplier: StateFlow<Float> = repository.fontSizeMultiplier
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
 
-    val themeColorIndex: StateFlow<Int> = repository.themeColorIndex
+    val themeColorIndex: Flow<Int> = repository.themeColorIndex
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val dynamicColor: StateFlow<Boolean> = repository.dynamicColor
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val seedColor: StateFlow<Long> = repository.seedColor
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0xFFB71C1C)
@@ -42,6 +46,12 @@ class SettingsViewModel @Inject constructor(
     fun setThemeColor(index: Int) {
         viewModelScope.launch {
             repository.setThemeColor(index)
+        }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setDynamicColor(enabled)
         }
     }
 
