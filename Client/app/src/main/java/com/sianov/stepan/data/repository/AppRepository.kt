@@ -13,6 +13,7 @@ class AppRepository @Inject constructor(
     val apiService: ApiService
 ) {
     private val performanceCache = mutableMapOf<String, PerformanceDetail>()
+    private val newsDetailCache = mutableMapOf<String, String>()
 
     suspend fun getPosters(): List<AppItem> {
         return try {
@@ -24,6 +25,7 @@ class AppRepository @Inject constructor(
     }
 
     suspend fun getNews(): List<AppItem> {
+        newsDetailCache.clear() // Очищаем кеш деталей при обновлении списка
         return try {
             val fromApi = apiService.getNews()
             if (fromApi.isNotEmpty()) fromApi else scraper.fetchNews()
@@ -36,6 +38,7 @@ class AppRepository @Inject constructor(
     
     fun clearPerformanceCache() {
         performanceCache.clear()
+        newsDetailCache.clear()
     }
     
     suspend fun getPerformanceDetail(url: String): PerformanceDetail? {
@@ -43,6 +46,15 @@ class AppRepository @Inject constructor(
         val detail = scraper.fetchPerformanceDetail(url)
         if (detail != null) {
             performanceCache[url] = detail
+        }
+        return detail
+    }
+
+    suspend fun getNewsDetail(url: String): String {
+        newsDetailCache[url]?.let { return it }
+        val detail = scraper.fetchNewsDetail(url)
+        if (detail.isNotEmpty()) {
+            newsDetailCache[url] = detail
         }
         return detail
     }

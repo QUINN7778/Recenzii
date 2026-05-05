@@ -5,7 +5,8 @@ data class PerformanceDetail(
     val imageUrl: String,
     val description: String,
     val cast: List<CastMember>,
-    val detailUrl: String = "", // Добавляем поле для URL
+    val detailUrl: String = "",
+    val buyTicketUrl: String? = null,
     val galleryImages: List<String> = emptyList(),
     val author: String? = null,
     val acts: String? = null,

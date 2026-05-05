@@ -22,7 +22,10 @@ import com.sianov.stepan.ui.viewmodel.NewsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewsScreen(viewModel: NewsViewModel = hiltViewModel()) {
+fun NewsScreen(
+    onNewsClick: (com.sianov.stepan.data.model.AppItem) -> Unit,
+    viewModel: NewsViewModel = hiltViewModel()
+) {
     val news by viewModel.filteredNews.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -90,7 +93,11 @@ fun NewsScreen(viewModel: NewsViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(news) { newsItem ->
-                    AppItemCard(newsItem, viewModel.repository)
+                    AppItemCard(
+                        item = newsItem,
+                        repository = viewModel.repository,
+                        onClick = { onNewsClick(newsItem) }
+                    )
                 }
             }
         }

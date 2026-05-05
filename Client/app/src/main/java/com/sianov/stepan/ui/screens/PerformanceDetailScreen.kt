@@ -43,6 +43,7 @@ import android.net.Uri
 fun PerformanceDetailScreen(
     url: String,
     onBack: () -> Unit,
+    onNavigateToWebView: (String) -> Unit,
     viewModel: PerformanceDetailViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -102,8 +103,8 @@ fun PerformanceDetailScreen(
                 ) {
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            context.startActivity(intent)
+                            val targetUrl = detail?.buyTicketUrl ?: url
+                            onNavigateToWebView(targetUrl)
                         },
                         modifier = Modifier
                             .fillMaxWidth()

@@ -74,6 +74,17 @@ class MainActivity : ComponentActivity() {
                                 val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
                                 navController.navigate("detail/$encodedUrl")
                             },
+                            onNavigateToWebView = { url ->
+                                val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+                                navController.navigate("webview/$encodedUrl")
+                            },
+                            onNavigateToNewsDetail = { news ->
+                                val encodedUrl = URLEncoder.encode(news.detailUrl, StandardCharsets.UTF_8.toString())
+                                val encodedTitle = URLEncoder.encode(news.title, StandardCharsets.UTF_8.toString())
+                                val encodedDate = URLEncoder.encode(news.date, StandardCharsets.UTF_8.toString())
+                                val encodedImg = URLEncoder.encode(news.imageUrl, StandardCharsets.UTF_8.toString())
+                                navController.navigate("news_detail/$encodedUrl/$encodedTitle/$encodedDate/$encodedImg")
+                            },
                             onLogout = {
                                 navController.navigate("auth") { popUpTo("main") { inclusive = true } }
                             }
@@ -84,7 +95,43 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("url") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val decodedUrl = URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", StandardCharsets.UTF_8.toString())
-                        PerformanceDetailScreen(url = decodedUrl, onBack = { navController.popBackStack() })
+                        PerformanceDetailScreen(
+                            url = decodedUrl,
+                            onBack = { navController.popBackStack() },
+                            onNavigateToWebView = { targetUrl ->
+                                val encodedUrl = URLEncoder.encode(targetUrl, StandardCharsets.UTF_8.toString())
+                                navController.navigate("webview/$encodedUrl")
+                            }
+                        )
+                    }
+                    composable(
+                        route = "webview/{url}",
+                        arguments = listOf(navArgument("url") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val decodedUrl = URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", StandardCharsets.UTF_8.toString())
+                        WebViewScreen(url = decodedUrl, onBack = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = "news_detail/{url}/{title}/{date}/{imageUrl}",
+                        arguments = listOf(
+                            navArgument("url") { type = NavType.StringType },
+                            navArgument("title") { type = NavType.StringType },
+                            navArgument("date") { type = NavType.StringType },
+                            navArgument("imageUrl") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        val url = URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", StandardCharsets.UTF_8.toString())
+                        val title = URLDecoder.decode(backStackEntry.arguments?.getString("title") ?: "", StandardCharsets.UTF_8.toString())
+                        val date = URLDecoder.decode(backStackEntry.arguments?.getString("date") ?: "", StandardCharsets.UTF_8.toString())
+                        val imageUrl = URLDecoder.decode(backStackEntry.arguments?.getString("imageUrl") ?: "", StandardCharsets.UTF_8.toString())
+                        
+                        NewsDetailScreen(
+                            url = url,
+                            title = title,
+                            date = date,
+                            imageUrl = imageUrl,
+                            onBack = { navController.popBackStack() }
+                        )
                     }
                 }
             }
@@ -92,7 +139,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 @Composable
-fun MainScreen(onNavigateToDetail: (String) -> Unit, onLogout: () -> Unit) {
+fun MainScreen(
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToWebView: (String) -> Unit,
+    onNavigateToNewsDetail: (com.sianov.stepan.data.model.AppItem) -> Unit,
+    onLogout: () -> Unit
+) {
     val items = listOf(Screen.Posters, Screen.MyTheatre, Screen.News, Screen.Settings)
     val pagerState = rememberPagerState(pageCount = { items.size })
     val coroutineScope = rememberCoroutineScope()
@@ -118,7 +170,7 @@ fun MainScreen(onNavigateToDetail: (String) -> Unit, onLogout: () -> Unit) {
             when (page) {
                 0 -> PosterScreen(onItemClick = { item -> onNavigateToDetail(item.detailUrl) })
                 1 -> MyTheatreScreen(onNavigateToDetail = onNavigateToDetail)
-                2 -> NewsScreen()
+                2 -> NewsScreen(onNewsClick = onNavigateToNewsDetail)
                 3 -> SettingsScreen(onLogout = onLogout)
             }
         }

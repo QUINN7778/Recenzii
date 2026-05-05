@@ -286,12 +286,23 @@ class IvMuzScraper @Inject constructor() {
                 }
             }
 
+            var buyTicketUrl: String? = null
+            val buyButtons = doc.select("a[href*=ivanovokoncert.ru], a:contains(Купить билет)")
+            for (btn in buyButtons) {
+                val href = btn.attr("href")
+                if (href.contains("ivanovokoncert.ru")) {
+                    buyTicketUrl = href
+                    break
+                }
+            }
+
             return@withContext PerformanceDetail(
                 title = title,
                 imageUrl = gallery.firstOrNull() ?: "",
                 description = extractPlot(doc, title),
                 cast = cast.distinctBy { "${it.role}:${it.name}" },
                 detailUrl = url,
+                buyTicketUrl = buyTicketUrl,
                 galleryImages = gallery,
                 author = author,
                 acts = acts,
@@ -334,17 +345,75 @@ class IvMuzScraper @Inject constructor() {
                 val title = element.select(".text").text().ifEmpty { element.select("a").text() }.trim()
                 val date = element.select(".date").text().trim()
                 if (title.isNotEmpty() && date.isNotEmpty()) {
-                    // Улучшенный поиск картинки в новостях
+                    var url = element.select("a").first()?.attr("href") ?: ""
+                    if (url.startsWith("/")) url = baseUrl + url
+                    
                     var img = element.select("img").first()?.attr("src") 
                         ?: element.select(".image img").attr("src")
                         ?: ""
                     
                     if (img.startsWith("/")) img = baseUrl + img
-                    items.add(AppItem(title, "", date, img, ""))
+                    items.add(AppItem(title, "", date, img, url))
                 }
             }
             return@withContext items
         } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun fetchNewsDetail(url: String): String = withContext(Dispatchers.IO) {
+        try {
+            if (url.isEmpty()) return@withContext ""
+            val fullUrl = if (url.startsWith("/")) baseUrl + url else url
+            val doc: Document = Jsoup.connect(fullUrl).userAgent(userAgent).timeout(20000).get()
+            
+            // 1. Поиск основного контейнера с текстом (расширенный список селекторов)
+            val contentSelectors = arrayOf(
+                ".news-item-detail",
+                ".news_item_page",
+                ".text_content",
+                ".news-detail",
+                ".detail_text",
+                ".content-text",
+                ".article-content",
+                "#content",
+                ".content"
+            )
+            
+            var contentElement: Element? = null
+            for (selector in contentSelectors) {
+                val found = doc.select(selector).first()
+                if (found != null && found.text().length > 20) {
+                    contentElement = found
+                    break
+                }
+            }
+
+            val text = if (contentElement != null) {
+                // Пытаемся достать параграфы
+                val paragraphs = contentElement.select("p")
+                if (paragraphs.isNotEmpty() && paragraphs.text().length > 20) {
+                    paragraphs.map { it.text().trim() }
+                        .filter { it.length > 2 }
+                        .joinToString("\n\n")
+                } else {
+                    // Если параграфов нет, берем текст целиком и разбиваем по смыслу
+                    contentElement.text().replace(". ", ".\n\n")
+                }
+            } else {
+                // План В: Ищем самый длинный текстовый блок на странице
+                doc.select("div")
+                    .map { it }
+                    .filter { it.text().length > 100 && it.children().isEmpty() }
+                    .maxByOrNull { it.text().length }
+                    ?.text() ?: ""
+            }
+
+            return@withContext text
+                .replace("Назад к списку", "")
+                .replace("Вернуться в раздел", "")
+                .replace("Все новости", "")
+                .trim()
+        } catch (e: Exception) { "" }
     }
 
     suspend fun getImageBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
