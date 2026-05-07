@@ -40,7 +40,15 @@ fun WebViewScreen(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         webViewClient = WebViewClient()
-                        settings.javaScriptEnabled = true
+                        settings.apply {
+                            javaScriptEnabled = true
+                            useWideViewPort = true
+                            loadWithOverviewMode = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
+                        }
                         loadUrl(url)
                     }
                 },

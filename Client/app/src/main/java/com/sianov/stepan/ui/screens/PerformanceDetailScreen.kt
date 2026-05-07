@@ -139,7 +139,7 @@ fun PerformanceDetailScreen(
                             state = pagerState,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
+                                .padding(horizontal = 16.dp, vertical = 16.dp)
                                 .clip(RoundedCornerShape(16.dp))
                         ) { page ->
                             Card(
@@ -154,6 +154,30 @@ fun PerformanceDetailScreen(
                                         .aspectRatio(1f),
                                     contentScale = ContentScale.Crop
                                 )
+                            }
+                        }
+
+                        // Индикаторы страниц (точечки)
+                        if (images.size > 1) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                repeat(images.size) { iteration ->
+                                    val color = if (pagerState.currentPage == iteration) 
+                                        MaterialTheme.colorScheme.primary 
+                                    else 
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 4.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .size(8.dp)
+                                    )
+                                }
                             }
                         }
 
