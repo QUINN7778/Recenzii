@@ -16,11 +16,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.sianov.stepan.ui.viewmodel.SettingsViewModel
 import com.sianov.stepan.ui.viewmodel.AuthViewModel
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onNavigateToPermissions: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -30,6 +36,8 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsState(initial = false)
     val user by authViewModel.user.collectAsState()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
+
+    val context = LocalContext.current
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Настройки") }) }
@@ -76,7 +84,16 @@ fun SettingsScreen(
                         Icon(Icons.Default.Palette, null)
                         Spacer(Modifier.width(16.dp))
                         Text("Динамические цвета", Modifier.weight(1f))
-                        Switch(checked = dynamicColor, onCheckedChange = { viewModel.setDynamicColor(it) })
+                        Switch(
+                            checked = dynamicColor, 
+                            onCheckedChange = { enabled ->
+                                if (enabled && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+                                    // Можно добавить Toast
+                                } else {
+                                    viewModel.setDynamicColor(enabled)
+                                }
+                            }
+                        )
                     }
                     Spacer(Modifier.height(16.dp))
                     Text("Размер шрифта: ${(fontSizeMultiplier * 100).toInt()}%")
@@ -103,12 +120,45 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. О приложении
-            SettingsSection("О приложении")
-            Card(shape = cardShape, modifier = cardModifier) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Версия 1.2.0 (Stable)", style = MaterialTheme.typography.bodyMedium)
-                    Text("Разработчик: Сиянов Степан", style = MaterialTheme.typography.bodyMedium)
+            // 4. Безопасность (ВОТ ОНА!)
+            SettingsSection("Безопасность")
+            Card(
+                shape = cardShape, 
+                modifier = cardModifier.clickable { onNavigateToPermissions() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp), 
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Security, null)
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text("Разрешения", fontWeight = FontWeight.Bold)
+                        Text("Управление доступом приложения", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.ChevronRight, null)
+                }
+            }
+
+            // 5. О приложении
+            SettingsSection("Приложение")
+            Card(
+                shape = cardShape, 
+                modifier = cardModifier.clickable { onNavigateToAbout() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp), 
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Info, null)
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text("О приложении", fontWeight = FontWeight.Bold)
+                        Text("Версия 1.2.0 (Stable)", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.ChevronRight, null)
                 }
             }
             Spacer(Modifier.height(32.dp))

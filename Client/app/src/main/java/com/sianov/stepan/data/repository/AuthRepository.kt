@@ -115,12 +115,20 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun toggleReminder(performanceUrl: String) {
+    suspend fun toggleReminder(performanceUrl: String, title: String? = null, dateStr: String? = null) {
         val username = getUserNameSync() ?: return
         context.authDataStore.edit { prefs ->
             val key = getRemindersKey(username)
             val current = prefs[key] ?: emptySet()
-            prefs[key] = if (current.contains(performanceUrl)) current - performanceUrl else current + performanceUrl
+            if (current.contains(performanceUrl)) {
+                prefs[key] = current - performanceUrl
+                com.sianov.stepan.utils.ReminderScheduler.cancelReminders(context, performanceUrl)
+            } else {
+                prefs[key] = current + performanceUrl
+                if (title != null && dateStr != null) {
+                    com.sianov.stepan.utils.ReminderScheduler.scheduleReminders(context, performanceUrl, title, dateStr)
+                }
+            }
         }
     }
 

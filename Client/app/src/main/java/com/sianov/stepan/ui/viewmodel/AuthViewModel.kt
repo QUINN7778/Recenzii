@@ -78,9 +78,9 @@ class AuthViewModel @Inject constructor(
         }
     }
     
-    fun toggleReminder(url: String) {
+    fun toggleReminder(url: String, title: String? = null, date: String? = null) {
         viewModelScope.launch {
-            repository.toggleReminder(url)
+            repository.toggleReminder(url, title, date)
         }
     }
     

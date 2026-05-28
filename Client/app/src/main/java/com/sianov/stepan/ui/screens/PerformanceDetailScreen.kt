@@ -38,15 +38,31 @@ import com.sianov.stepan.ui.viewmodel.AuthViewModel
 import android.content.Intent
 import android.net.Uri
 
+import android.Manifest
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.app.AlarmManager
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import android.os.Build
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PerformanceDetailScreen(
     url: String,
+    performanceDate: String,
     onBack: () -> Unit,
     onNavigateToWebView: (String) -> Unit,
     viewModel: PerformanceDetailViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
     val detail by viewModel.detail.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val reviews by viewModel.reviews.collectAsState()
@@ -64,7 +80,6 @@ fun PerformanceDetailScreen(
     var userRating by remember { mutableIntStateOf(5) }
     var userComment by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
     val message by viewModel.message.collectAsState()
 
     LaunchedEffect(message) {
@@ -210,7 +225,39 @@ fun PerformanceDetailScreen(
                                     label = "Напомнить",
                                     isActive = reminders.contains(url),
                                     activeColor = Color(0xFFFF9800),
-                                    onClick = { if (isLoggedIn) authViewModel.toggleReminder(url) }
+                                    onClick = { 
+                                        if (isLoggedIn) {
+                                            val detailObj = detail
+                                            if (detailObj != null) {
+                                                // Если напоминание уже стоит, просто удаляем его без проверок
+                                                if (reminders.contains(url)) {
+                                                    authViewModel.toggleReminder(url, detailObj.title, performanceDate)
+                                                    return@ActionButton
+                                                }
+
+                                                // Проверка разрешений перед постановкой нового напоминания
+                                                val hasNotify = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                                                } else true
+
+                                                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                                                val hasAlarm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                                    alarmManager.canScheduleExactAlarms()
+                                                } else true
+
+                                                if (!hasNotify && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                } else if (!hasAlarm && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                        data = Uri.fromParts("package", context.packageName, null)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } else {
+                                                    authViewModel.toggleReminder(url, detailObj.title, performanceDate)
+                                                }
+                                            }
+                                        } 
+                                    }
                                 )
                                 ActionButton(
                                     icon = if (visited.contains(url)) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,

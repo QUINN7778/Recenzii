@@ -24,7 +24,7 @@ import com.sianov.stepan.ui.viewmodel.PosterViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTheatreScreen(
-    onNavigateToDetail: (String) -> Unit,
+    onNavigateToDetail: (AppItem) -> Unit,
     authViewModel: AuthViewModel = hiltViewModel(),
     posterViewModel: PosterViewModel = hiltViewModel()
 ) {
@@ -119,7 +119,7 @@ fun MyTheatreScreen(
                         items(currentList) { item ->
                             AppItemCard(
                                 item = item,
-                                onClick = { onNavigateToDetail(item.detailUrl) },
+                                onClick = { onNavigateToDetail(item) },
                                 repository = posterViewModel.repository
                             )
                         }

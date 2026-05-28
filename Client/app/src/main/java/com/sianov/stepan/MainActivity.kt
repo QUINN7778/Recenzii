@@ -1,9 +1,12 @@
 package com.sianov.stepan
 
 import android.os.Bundle
+import android.os.Build
+import android.Manifest
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -40,8 +43,19 @@ sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector,
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Результат можно не обрабатывать тостом, если пользователь так хочет
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Создаем каналы уведомлений
+        com.sianov.stepan.utils.NotificationHelper(this)
+
         enableEdgeToEdge()
         setContent {
             val settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -70,9 +84,10 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("main") {
                         MainScreen(
-                            onNavigateToDetail = { url ->
-                                val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
-                                navController.navigate("detail/$encodedUrl")
+                            onNavigateToDetail = { item ->
+                                val encodedUrl = URLEncoder.encode(item.detailUrl, StandardCharsets.UTF_8.toString())
+                                val encodedDate = URLEncoder.encode(item.date, StandardCharsets.UTF_8.toString())
+                                navController.navigate("detail/$encodedUrl/$encodedDate")
                             },
                             onNavigateToWebView = { url ->
                                 val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
@@ -85,18 +100,29 @@ class MainActivity : ComponentActivity() {
                                 val encodedImg = URLEncoder.encode(news.imageUrl, StandardCharsets.UTF_8.toString())
                                 navController.navigate("news_detail/$encodedUrl/$encodedTitle/$encodedDate/$encodedImg")
                             },
+                            onNavigateToAbout = {
+                                navController.navigate("about")
+                            },
+                            onNavigateToPermissions = {
+                                navController.navigate("permissions")
+                            },
                             onLogout = {
                                 navController.navigate("auth") { popUpTo("main") { inclusive = true } }
                             }
                         )
                     }
                     composable(
-                        route = "detail/{url}",
-                        arguments = listOf(navArgument("url") { type = NavType.StringType })
+                        route = "detail/{url}/{date}",
+                        arguments = listOf(
+                            navArgument("url") { type = NavType.StringType },
+                            navArgument("date") { type = NavType.StringType }
+                        )
                     ) { backStackEntry ->
                         val decodedUrl = URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", StandardCharsets.UTF_8.toString())
+                        val decodedDate = URLDecoder.decode(backStackEntry.arguments?.getString("date") ?: "", StandardCharsets.UTF_8.toString())
                         PerformanceDetailScreen(
                             url = decodedUrl,
+                            performanceDate = decodedDate,
                             onBack = { navController.popBackStack() },
                             onNavigateToWebView = { targetUrl ->
                                 val encodedUrl = URLEncoder.encode(targetUrl, StandardCharsets.UTF_8.toString())
@@ -133,6 +159,12 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() }
                         )
                     }
+                    composable("about") {
+                        AboutScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable("permissions") {
+                        PermissionsScreen(onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
@@ -140,9 +172,11 @@ class MainActivity : ComponentActivity() {
 }
 @Composable
 fun MainScreen(
-    onNavigateToDetail: (String) -> Unit,
+    onNavigateToDetail: (com.sianov.stepan.data.model.AppItem) -> Unit,
     onNavigateToWebView: (String) -> Unit,
     onNavigateToNewsDetail: (com.sianov.stepan.data.model.AppItem) -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onNavigateToPermissions: () -> Unit,
     onLogout: () -> Unit
 ) {
     val items = listOf(Screen.Posters, Screen.MyTheatre, Screen.News, Screen.Settings)
@@ -168,10 +202,14 @@ fun MainScreen(
             modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
         ) { page ->
             when (page) {
-                0 -> PosterScreen(onItemClick = { item -> onNavigateToDetail(item.detailUrl) })
+                0 -> PosterScreen(onItemClick = { item -> onNavigateToDetail(item) })
                 1 -> MyTheatreScreen(onNavigateToDetail = onNavigateToDetail)
                 2 -> NewsScreen(onNewsClick = onNavigateToNewsDetail)
-                3 -> SettingsScreen(onLogout = onLogout)
+                3 -> SettingsScreen(
+                    onLogout = onLogout, 
+                    onNavigateToAbout = onNavigateToAbout,
+                    onNavigateToPermissions = onNavigateToPermissions
+                )
             }
         }
     }
