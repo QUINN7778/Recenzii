@@ -3,12 +3,7 @@ package com.sianov.stepan.ui.screens
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.DownloadListener
-import android.app.DownloadManager
 import android.content.Context
-import android.net.Uri
-import android.os.Environment
-import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -28,11 +23,8 @@ fun WebViewScreen(
     url: String,
     onBack: () -> Unit
 ) {
-    var showDownloadDialog by remember { mutableStateOf(false) }
-    var pendingDownloadUrl by remember { mutableStateOf("") }
-    var pendingMimetype by remember { mutableStateOf("") }
-    var pendingContentDisposition by remember { mutableStateOf("") }
-    var pendingUserAgent by remember { mutableStateOf("") }
+    // Состояние загрузки для скрытия мерцания
+    var isWebLoading by remember { mutableStateOf(true) }
 
     val context = LocalContext.current
 
@@ -56,153 +48,94 @@ fun WebViewScreen(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        // Используем агрессивный WebViewClient для полной очистки интерфейса сайта
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                val script = """
-                                    (function() {
-                                        function nukeElements() {
-                                            // 1. Массив селекторов всех возможных элементов шапки и подвала
-                                            var selectors = [
-                                                'header', '.header', '#header', '.top-panel', '.navbar', 
-                                                '.top_menu', '.mobile-header', '.footer', '.site-footer', 
-                                                '.breadcrumbs', '.breadcrumb', '.top-line', '.top_line',
-                                                '.navigation', '.nav-container', '.menu-wrapper',
-                                                '.header-middle', '.header-bottom', '.header-top'
-                                            ];
-                                            
-                                            selectors.forEach(function(s) {
-                                                document.querySelectorAll(s).forEach(function(el) {
-                                                    el.style.display = 'none';
-                                                    el.style.visibility = 'hidden';
-                                                    el.style.height = '0px';
-                                                    el.style.overflow = 'hidden';
-                                                });
-                                            });
+                        
+                        // Скрываем WebView пока не применили скрипты
+                        alpha = 0f
 
-                                            // 2. Скрываем элементы по тексту (навигационные кнопки)
-                                            var textToHide = [
-                                                'список мероприятий', 'все события', 'главная', 
-                                                'иваново концерт', 'история заказов', 'касса', 
-                                                'личный кабинет', 'войти', 'регистрация'
-                                            ];
-                                            
-                                            document.querySelectorAll('a, button, span, div, li').forEach(function(el) {
-                                                var text = el.textContent.trim().toLowerCase();
-                                                textToHide.forEach(function(target) {
-                                                    if (text === target || (text.includes(target) && el.childNodes.length <= 2)) {
-                                                        el.style.display = 'none';
-                                                    }
-                                                });
-                                            });
+                        val nukeScript = """
+                            (function() {
+                                function nukeElements() {
+                                    var selectors = [
+                                        'header', '.header', '#header', '.top-panel', '.navbar', 
+                                        '.top_menu', '.mobile-header', '.footer', '.site-footer', 
+                                        '.breadcrumbs', '.breadcrumb', '.top-line', '.top_line',
+                                        '.navigation', '.nav-container', '.menu-wrapper',
+                                        '.header-middle', '.header-bottom', '.header-top'
+                                    ];
+                                    
+                                    selectors.forEach(function(s) {
+                                        document.querySelectorAll(s).forEach(function(el) {
+                                            el.style.display = 'none';
+                                            el.style.visibility = 'hidden';
+                                        });
+                                    });
 
-                                            // 3. Убираем лишние отступы у body и main
-                                            document.body.style.paddingTop = '0px';
-                                            document.body.style.marginTop = '0px';
-                                            var main = document.querySelector('main, .main-content, #content');
-                                            if (main) {
-                                                main.style.paddingTop = '0px';
-                                                main.style.marginTop = '0px';
+                                    var textToHide = [
+                                        'список мероприятий', 'все события', 'главная', 
+                                        'иваново концерт', 'история заказов', 'касса', 
+                                        'личный кабинет', 'войти', 'регистрация'
+                                    ];
+                                    
+                                    document.querySelectorAll('a, button, span, div, li').forEach(function(el) {
+                                        var text = el.textContent.trim().toLowerCase();
+                                        textToHide.forEach(function(target) {
+                                            if (text === target || (text.includes(target) && el.childNodes.length <= 2)) {
+                                                el.style.display = 'none';
                                             }
-                                        }
+                                        });
+                                    });
 
-                                        // Запускаем очистку сразу
-                                        nukeElements();
+                                    document.body.style.paddingTop = '0px';
+                                    document.body.style.marginTop = '0px';
+                                }
 
-                                        // И следим за изменениями (на случай динамической подгрузки)
-                                        var observer = new MutationObserver(nukeElements);
-                                        observer.observe(document.body, { childList: true, subtree: true });
+                                nukeElements();
+                                var observer = new MutationObserver(nukeElements);
+                                observer.observe(document.body, { childList: true, subtree: true });
+                            })();
+                        """.trimIndent()
 
-                                        // Дополнительный "добивающий" таймер на 5 секунд
-                                        var count = 0;
-                                        var interval = setInterval(function() {
-                                            nukeElements();
-                                            if (count++ > 10) clearInterval(interval);
-                                        }, 500);
-                                    })();
-                                """.trimIndent()
-                                view?.evaluateJavascript(script, null)
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                isWebLoading = true
+                                view?.alpha = 0f
+                                view?.evaluateJavascript(nukeScript, null)
                             }
-                        }
 
-                        setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
-                            pendingDownloadUrl = downloadUrl
-                            pendingUserAgent = userAgent
-                            pendingContentDisposition = contentDisposition
-                            pendingMimetype = mimetype
-                            showDownloadDialog = true
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                view?.evaluateJavascript(nukeScript) {
+                                    // Показываем WebView только когда скрипт отработал
+                                    isWebLoading = false
+                                    view.alpha = 1f
+                                }
+                            }
                         }
 
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
-
-                            // ЭТО УБИРАЕТ ГИГА-ЗУМ: Отключаем автоматическое увеличение текста
                             layoutAlgorithm = android.webkit.WebSettings.LayoutAlgorithm.NORMAL
-
-                            // ВКЛЮЧАЕМ ЗУМ: разрешаем пользователю самому масштабировать страницу
                             setSupportZoom(true)
                             builtInZoomControls = true
-                            displayZoomControls = false // Скрываем уродливые кнопки +/- (зум будет пальцами)
-                            
-                            // Эти настройки помогут странице изначально вписаться в экран
+                            displayZoomControls = false 
                             useWideViewPort = true
                             loadWithOverviewMode = true
-                            
-                            // Масштаб текста стандартный
                             textZoom = 100
-                            
-                            // Мобильный User Agent
                             userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
                         }
-
-                        // Устанавливаем начальный масштаб в 0 (по умолчанию), 
-                        // чтобы WebView сам определил плотность пикселей
                         setInitialScale(0)
                         loadUrl(url)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
-        }
-    }
-
-    if (showDownloadDialog) {
-        AlertDialog(
-            onDismissRequest = { showDownloadDialog = false },
-            title = { Text("Загрузка файла") },
-            text = { Text("Вы хотите скачать электронную копию билета?") },
-            confirmButton = {
-                Button(onClick = {
-                    showDownloadDialog = false
-                    try {
-                        val request = DownloadManager.Request(Uri.parse(pendingDownloadUrl))
-                        request.setMimeType(pendingMimetype)
-                        val fileName = android.webkit.URLUtil.guessFileName(pendingDownloadUrl, pendingContentDisposition, pendingMimetype)
-                        
-                        request.addRequestHeader("User-Agent", pendingUserAgent)
-                        request.setDescription("Загрузка билета...")
-                        request.setTitle(fileName)
-                        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                        
-                        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                        dm.enqueue(request)
-                        
-                        Toast.makeText(context, "Загрузка началась", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                }) {
-                    Text("Скачать")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDownloadDialog = false }) {
-                    Text("Отмена")
+            
+            if (isWebLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    CircularProgressIndicator()
                 }
             }
-        )
+        }
     }
 }

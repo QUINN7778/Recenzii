@@ -89,7 +89,12 @@ class IvMuzScraper @Inject constructor() {
         "Дюймовочка" to "Путешествие крошечной девочки по большому миру. Встречи с жабами, жуком, кротом и, наконец, счастливое спасение и встреча с королем эльфов.",
         "Каприз императрицы" to "Увлекательная музыкальная комедия, действие которой происходит в блестящую эпоху правления Елизаветы Петровны. Вас ждут придворные интриги, юмор и, конечно, любовь.",
         "Царевна-лягушка" to "Веселая музыкальная сказка для всей семьи. История о том, как Иван-царевич нашел свое счастье в болоте, и о том, что истинная красота скрыта внутри. Яркие костюмы и любимые герои.",
-        "Принцесса на горошине" to "Волшебная сказка о настоящей принцессе, которая смогла почувствовать маленькую горошину через двенадцать матрасов. Музыкальная история о благородстве и искренности."
+        "Принцесса на горошине" to "Волшебная сказка о настоящей принцессе, которая смогла почувствовать маленькую горошину через двенадцать матрасов. Музыкальная история о благородстве и искренности.",
+        "Фанфан-Тюльпан" to "Героическая музыкальная комедия о приключениях обаятельного авантюриста Фанфана. Блеск шпаг, погони, интриги и, конечно, побеждающая всё любовь в декорациях Франции XVIII века.",
+        "Летучий корабль" to "Музыкальная сказка о мечте и любви. Трубочист Иван и царевна Забава строят летучий корабль, чтобы улететь от жадного боярина Полкана к своему счастью.",
+        "Искусство жениться" to "Искрометная музыкальная комедия по пьесе Оскара Уайльда 'Как важно быть серьезным'. Тонкий английский юмор, запутанные интриги и неожиданные признания.",
+        "Дон Сезар де Базан" to "Героическая комедия плаща и шпаги. История благородного дворянина, который оказывается втянут в придворную интригу, но благодаря своей смелости и чувству юмора находит любовь и спасает честь.",
+        "Марица" to "Оперетта Имре Кальмана, полная страстных цыганских мелодий и венгерских танцев. История гордой графини Марицы и ее таинственного управляющего."
     )
 
     private fun trustAllCertificates() {
@@ -318,8 +323,8 @@ class IvMuzScraper @Inject constructor() {
             val items = mutableListOf<AppItem>()
             val elements: Elements = doc.select(".cell.active")
             for (element in elements) {
-                val title = element.select(".name").text().trim()
-                if (title.isNotEmpty()) {
+                val rawTitle = element.select(".name").text().trim()
+                if (rawTitle.isNotEmpty()) {
                     val day = element.select(".day").text().trim()
                     val month = element.select(".month").text().trim()
                     val time = element.select(".time").text().trim()
@@ -329,12 +334,34 @@ class IvMuzScraper @Inject constructor() {
                     if (img.startsWith("/")) img = baseUrl + img
                     var url = element.select("a").first()?.attr("href") ?: ""
                     if (url.startsWith("/")) url = baseUrl + url
-                    items.add(AppItem(title, "", dateStr, img, url))
-                }
-            }
-            return@withContext items.distinctBy { cleanTitle(it.title) }
-        } catch (e: Exception) { emptyList() }
-    }
+
+                    // 1. Пытаемся понять жанр по всему тексту ячейки (Task 4 fix)
+                    val fullCellText = element.text().lowercase()
+                    val inferredGenre = when {
+                        fullCellText.contains("мюзикл") -> "мюзикл"
+                        fullCellText.contains("оперетта") -> "оперетта"
+                        fullCellText.contains("комедия") -> "комедия"
+                        fullCellText.contains("сказка") -> "сказка"
+                        fullCellText.contains("драма") -> "драма"
+                        fullCellText.contains("концерт") -> "концерт"
+                        fullCellText.contains("балет") || fullCellText.contains("хореограф") -> "балет"
+                        else -> null
+                    }
+
+                    // 2. Получаем описание из нашей базы
+                    var description = getPlotByTitle(rawTitle)
+
+                    // 3. Если жанр нашли в тексте, но его нет в описании — добавляем его туда
+                    if (inferredGenre != null && !description.contains(inferredGenre, ignoreCase = true)) {
+                        description = "[$inferredGenre] $description"
+                    }
+
+                    items.add(AppItem(rawTitle, description, dateStr, img, url))
+                    }
+                    }
+                    // Убираем только полные дубликаты (Название + Дата), чтобы видеть все сеансы
+                    return@withContext items.distinctBy { it.title + it.date }
+                    } catch (e: Exception) { emptyList() }    }
 
     suspend fun fetchNews(): List<AppItem> = withContext(Dispatchers.IO) {
         try {

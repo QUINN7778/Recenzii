@@ -106,6 +106,9 @@ class MainActivity : ComponentActivity() {
                             onNavigateToPermissions = {
                                 navController.navigate("permissions")
                             },
+                            onNavigateToAppearance = {
+                                navController.navigate("appearance")
+                            },
                             onLogout = {
                                 navController.navigate("auth") { popUpTo("main") { inclusive = true } }
                             }
@@ -165,6 +168,9 @@ class MainActivity : ComponentActivity() {
                     composable("permissions") {
                         PermissionsScreen(onBack = { navController.popBackStack() })
                     }
+                    composable("appearance") {
+                        AppearanceScreen(onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
@@ -177,6 +183,7 @@ fun MainScreen(
     onNavigateToNewsDetail: (com.sianov.stepan.data.model.AppItem) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToPermissions: () -> Unit,
+    onNavigateToAppearance: () -> Unit,
     onLogout: () -> Unit
 ) {
     val items = listOf(Screen.Posters, Screen.MyTheatre, Screen.News, Screen.Settings)
@@ -208,7 +215,8 @@ fun MainScreen(
                 3 -> SettingsScreen(
                     onLogout = onLogout, 
                     onNavigateToAbout = onNavigateToAbout,
-                    onNavigateToPermissions = onNavigateToPermissions
+                    onNavigateToPermissions = onNavigateToPermissions,
+                    onNavigateToAppearance = onNavigateToAppearance
                 )
             }
         }

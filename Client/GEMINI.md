@@ -1,4 +1,4 @@
-# Diplom Project: Ivanovo Music Theatre App
+# IvMuz: Ivanovo Music Theatre App
 
 ## Project Overview
 This project is an Android application developed as a diploma project. It serves as a mobile client for the **Ivanovskyi Muzykalnyi Teatr** (Ivanovo Music Theatre), providing users with up-to-date information about upcoming performances and news.

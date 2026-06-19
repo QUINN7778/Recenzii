@@ -1,5 +1,7 @@
 package com.sianov.stepan.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,11 +12,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -24,8 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.sianov.stepan.data.model.CastMember
@@ -42,12 +44,16 @@ import android.Manifest
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
 import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.os.Build
+
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+
+import com.sianov.stepan.utils.DateUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +65,7 @@ fun PerformanceDetailScreen(
     viewModel: PerformanceDetailViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    val isPast = remember(performanceDate) { DateUtils.isPast(performanceDate) }
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -72,13 +79,10 @@ fun PerformanceDetailScreen(
     val visited by authViewModel.visited.collectAsState()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
-    // Настройка пейджера для свайпов
-    val pagerState = rememberPagerState(pageCount = { detail?.galleryImages?.size ?: 1 })
-
-    // Состояние для написания отзыва
     var showReviewDialog by remember { mutableStateOf(false) }
     var userRating by remember { mutableIntStateOf(5) }
     var userComment by remember { mutableStateOf("") }
+    var selectedFullScreenIndex by remember { mutableStateOf<Int?>(null) }
 
     val message by viewModel.message.collectAsState()
 
@@ -93,537 +97,405 @@ fun PerformanceDetailScreen(
         viewModel.loadDetail(url)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        text = detail?.title ?: "",
-                        maxLines = 1,
-                        style = MaterialTheme.typography.titleMedium
-                    ) 
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        val allImages = remember(detail) {
+            detail?.let { d ->
+                val gallery = d.galleryImages
+                if (gallery.isEmpty()) {
+                    listOf(d.imageUrl)
+                } else {
+                    // Переставляем постер (последний в галерее) в начало списка для просмотра
+                    val poster = gallery.last()
+                    val others = gallery.dropLast(1)
+                    listOf(poster) + others
                 }
-            )
-        },
-        bottomBar = {
-            if (detail != null && !isLoading) {
-                Surface(
-                    tonalElevation = 8.dp,
-                    shadowElevation = 8.dp
-                ) {
-                    Button(
-                        onClick = {
-                            val targetUrl = detail?.buyTicketUrl ?: url
-                            onNavigateToWebView(targetUrl)
+            } ?: emptyList()
+        }
+
+        Scaffold(
+            topBar = {
+                if (selectedFullScreenIndex == null) {
+                    TopAppBar(
+                        title = { },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                    CircleShape
+                                )
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                            }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Купить билет на сайте", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    )
+                }
+            },
+            bottomBar = {
+                if (detail != null && !isLoading && selectedFullScreenIndex == null) {
+                    Surface(tonalElevation = 8.dp, shadowElevation = 8.dp) {
+                        Button(
+                            onClick = { onNavigateToWebView(detail?.buyTicketUrl ?: url) },
+                            modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(Icons.Default.ShoppingCart, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Купить билет на сайте", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-        }
-    ) { padding ->
-        if (isLoading) {
-            Box(Modifier.padding(padding).fillMaxSize()) { SkeletonPerformanceDetail() }
-        } else if (detail != null) {
-            detail?.let { performance ->
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(MaterialTheme.colorScheme.surface)
-                ) {
-                    item {
-                        // 1. ГЛАВНАЯ КАРТИНКА (ТЕПЕРЬ СВАЙПАЕТСЯ)
-                        val images = performance.galleryImages.ifEmpty { listOf(performance.imageUrl) }
-                        val coroutineScope = rememberCoroutineScope()
-
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 16.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                        ) { page ->
-                            Card(
-                                shape = RoundedCornerShape(16.dp),
-                                elevation = CardDefaults.cardElevation(4.dp)
-                            ) {
+        ) { padding ->
+            if (isLoading) {
+                Box(Modifier.padding(padding).fillMaxSize()) { SkeletonPerformanceDetail() }
+            } else if (detail != null) {
+                detail?.let { performance ->
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        item {
+                            // 1. ГЕРОЙ-ИЗОБРАЖЕНИЕ (Статичный постер)
+                            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                                val mainImg = performance.galleryImages.lastOrNull() ?: performance.imageUrl
                                 NetworkImage(
-                                    url = images[page],
+                                    url = mainImg,
                                     repository = viewModel.repository,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(1f),
+                                    modifier = Modifier.fillMaxSize().clickable { 
+                                        selectedFullScreenIndex = 0 
+                                    },
                                     contentScale = ContentScale.Crop
                                 )
+                                // Градиент снизу
+                                Box(
+                                    modifier = Modifier.fillMaxSize().background(
+                                        Brush.verticalGradient(
+                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f)),
+                                            startY = 300f
+                                        )
+                                    )
+                                )
                             }
-                        }
 
-                        // Индикаторы страниц (точечки)
-                        if (images.size > 1) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                repeat(images.size) { iteration ->
-                                    val color = if (pagerState.currentPage == iteration) 
-                                        MaterialTheme.colorScheme.primary 
-                                    else 
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 4.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .size(8.dp)
+                            Column(Modifier.padding(16.dp)) {
+                                // 2. ЗАГОЛОВОК
+                                Text(
+                                    text = performance.title,
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 38.sp
+                                )
+
+                                Spacer(Modifier.height(24.dp))
+
+                                // 3. КОЛОНКА ИНФОРМАЦИИ
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (!performance.duration.isNullOrEmpty()) {
+                                        InfoRow(Icons.Outlined.Timer, "Продолжительность", performance.duration!!)
+                                    }
+                                    if (!performance.acts.isNullOrEmpty()) {
+                                        InfoRow(Icons.Outlined.TheaterComedy, "Постановка", performance.acts!!)
+                                    }
+                                    InfoRow(
+                                        Icons.Outlined.CalendarMonth, 
+                                        "Дата сеанса", 
+                                        if (isPast) "$performanceDate (НЕ АКТУАЛЬНО)" else performanceDate
                                     )
                                 }
-                            }
-                        }
 
-                        Column(Modifier.padding(horizontal = 16.dp)) {
-                            // 2. ЗАГОЛОВОК (СНИЗУ, КРУПНЫЙ)
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = performance.title,
-                                style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                lineHeight = 38.sp
-                            )
+                                Spacer(Modifier.height(32.dp))
 
-                            // ACTION BUTTONS ROW
-                            Spacer(Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                ActionButton(
-                                    icon = if (favorites.contains(url)) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    label = "Избранное",
-                                    isActive = favorites.contains(url),
-                                    activeColor = Color(0xFFE91E63),
-                                    onClick = { if (isLoggedIn) authViewModel.toggleFavorite(url) }
-                                )
-                                ActionButton(
-                                    icon = if (reminders.contains(url)) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                                    label = "Напомнить",
-                                    isActive = reminders.contains(url),
-                                    activeColor = Color(0xFFFF9800),
-                                    onClick = { 
-                                        if (isLoggedIn) {
-                                            val detailObj = detail
-                                            if (detailObj != null) {
-                                                // Если напоминание уже стоит, просто удаляем его без проверок
+                                // КНОПКИ ДЕЙСТВИЙ
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    ActionButton(
+                                        icon = if (favorites.contains(url)) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                                        label = "Избранное",
+                                        isActive = favorites.contains(url),
+                                        activeColor = Color(0xFFE91E63),
+                                        onClick = { if (isLoggedIn) authViewModel.toggleFavorite(url) }
+                                    )
+                                    ActionButton(
+                                        icon = if (reminders.contains(url)) Icons.Default.NotificationsActive else Icons.Outlined.NotificationsNone,
+                                        label = "Напомнить",
+                                        isActive = reminders.contains(url),
+                                        activeColor = Color(0xFFFF9800),
+                                        onClick = { 
+                                            if (isLoggedIn) {
                                                 if (reminders.contains(url)) {
-                                                    authViewModel.toggleReminder(url, detailObj.title, performanceDate)
+                                                    authViewModel.toggleReminder(url, performance.title, performanceDate)
                                                     return@ActionButton
                                                 }
-
-                                                // Проверка разрешений перед постановкой нового напоминания
                                                 val hasNotify = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                                                 } else true
-
                                                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                                                 val hasAlarm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                                     alarmManager.canScheduleExactAlarms()
                                                 } else true
-
                                                 if (!hasNotify && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                                 } else if (!hasAlarm && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                                        data = Uri.fromParts("package", context.packageName, null)
-                                                    }
-                                                    context.startActivity(intent)
+                                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply { data = Uri.fromParts("package", context.packageName, null) })
                                                 } else {
-                                                    authViewModel.toggleReminder(url, detailObj.title, performanceDate)
+                                                    authViewModel.toggleReminder(url, performance.title, performanceDate)
                                                 }
-                                            }
-                                        } 
-                                    }
-                                )
-                                ActionButton(
-                                    icon = if (visited.contains(url)) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
-                                    label = "Я был",
-                                    isActive = visited.contains(url),
-                                    activeColor = Color(0xFF4CAF50),
-                                    onClick = { if (isLoggedIn) authViewModel.toggleVisited(url) }
-                                )
-                            }
+                                            } 
+                                        }
+                                    )
+                                    ActionButton(
+                                        icon = if (visited.contains(url)) Icons.Default.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                                        label = "Я был",
+                                        isActive = visited.contains(url),
+                                        activeColor = Color(0xFF4CAF50),
+                                        onClick = { if (isLoggedIn) authViewModel.toggleVisited(url) }
+                                    )
+                                }
 
-                            if (!performance.acts.isNullOrEmpty()) {
-                                Spacer(Modifier.height(16.dp))
-                                Text(
-                                    text = performance.acts!!,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
+                                // СЮЖЕТ
+                                if (performance.description.isNotEmpty()) {
+                                    Spacer(Modifier.height(40.dp))
+                                    Text(text = "О спектакле", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(text = performance.description, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
 
-                            // 2. ГАЛЕРЕЯ (СИНХРОНИЗИРОВАНА С ПЕЙДЖЕРОМ)
-                            if (performance.galleryImages.isNotEmpty()) {
-                                Spacer(Modifier.height(24.dp))
-                                Text(
-                                    text = "Галерея",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(end = 16.dp)
-                                ) {
-                                    items(performance.galleryImages.size) { index ->
-                                        val img = performance.galleryImages[index]
-                                        Card(
-                                            modifier = Modifier
-                                                .width(140.dp)
-                                                .height(90.dp)
-                                                .clickable { 
-                                                    coroutineScope.launch {
-                                                        pagerState.animateScrollToPage(index)
-                                                    }
+                                // ГАЛЕРЕЯ
+                                if (performance.galleryImages.isNotEmpty()) {
+                                    Spacer(Modifier.height(40.dp))
+                                    Text(text = "Галерея", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(16.dp))
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(end = 16.dp)
+                                    ) {
+                                        items(performance.galleryImages.size) { index ->
+                                            val img = performance.galleryImages[index]
+                                            Card(
+                                                modifier = Modifier.width(180.dp).height(120.dp).clickable { 
+                                                    val fullIndex = allImages.indexOf(img)
+                                                    selectedFullScreenIndex = if (fullIndex != -1) fullIndex else 0
                                                 },
-                                            shape = RoundedCornerShape(12.dp),
-                                            border = if (pagerState.currentPage == index) 
-                                                BorderStroke(3.dp, MaterialTheme.colorScheme.primary) 
-                                                else null,
-                                            elevation = CardDefaults.cardElevation(2.dp)
-                                        ) {
-                                            NetworkImage(
-                                                url = img,
-                                                repository = viewModel.repository,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                NetworkImage(url = img, repository = viewModel.repository, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // АКТЕРЫ
+                                Spacer(Modifier.height(40.dp))
+                                Text(text = "Действующие лица", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(16.dp))
+                                if (performance.cast.isNotEmpty()) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        contentPadding = PaddingValues(end = 16.dp)
+                                    ) {
+                                        items(performance.cast) { actor -> CastMemberCard(actor, viewModel.repository) }
+                                    }
+                                }
+                                
+                                // ОТЗЫВЫ
+                                Spacer(Modifier.height(40.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "Отзывы", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    if (isLoggedIn) {
+                                        TextButton(onClick = { showReviewDialog = true }) {
+                                            Icon(Icons.Default.Edit, null)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Написать")
                                         }
                                     }
                                 }
                             }
-
-                            // 3. ПРОДОЛЖИТЕЛЬНОСТЬ
-                            if (!performance.duration.isNullOrEmpty()) {
-                                Spacer(Modifier.height(24.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Продолжительность: ",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = performance.duration!!,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                    }
-                                }
-                            }
-
-                            // 4. СЮЖЕТ
-                            if (performance.description.isNotEmpty()) {
-                                Spacer(Modifier.height(32.dp))
-                                Text(
-                                    text = "О спектакле",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = performance.description,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        lineHeight = 24.sp,
-                                        letterSpacing = 0.5.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // 5. АКТЕРЫ
-                            Spacer(Modifier.height(32.dp))
-                            Text(
-                                text = "Действующие лица и исполнители",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            
-                            if (performance.cast.isNotEmpty()) {
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    contentPadding = PaddingValues(end = 16.dp)
-                                ) {
-                                    items(performance.cast) { actor ->
-                                        CastMemberCard(actor, viewModel.repository)
-                                    }
-                                }
-                            } else {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "Состав исполнителей временно недоступен",
-                                        modifier = Modifier.padding(16.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-
-                            // 6. ОТЗЫВЫ (REVIEW SECTION)
-                            Spacer(Modifier.height(40.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Отзывы зрителей",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (isLoggedIn) {
-                                    TextButton(onClick = { showReviewDialog = true }) {
-                                        Icon(Icons.Default.Edit, contentDescription = null)
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Написать")
-                                    }
-                                }
-                            }
-
-                            if (reviews.isEmpty()) {
-                                Text(
-                                    text = "Будьте первым, кто оставит отзыв!",
-                                    modifier = Modifier.padding(vertical = 16.dp),
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
                         }
+                        items(reviews) { review -> ReviewCard(review) }
+                        item { Spacer(Modifier.height(120.dp)) }
                     }
+                }
+            }
+        }
 
-                    // Список отзывов
-                    items(reviews) { review ->
-                        ReviewCard(review)
-                    }
+        // ПОЛНОЭКРАННЫЙ ПРОСМОТР ФОТО (Свайп работает здесь!)
+        AnimatedVisibility(
+            visible = selectedFullScreenIndex != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f)
+        ) {
+            val fullScreenPagerState = rememberPagerState(
+                initialPage = selectedFullScreenIndex ?: 0,
+                pageCount = { allImages.size }
+            )
+            
+            LaunchedEffect(selectedFullScreenIndex) {
+                selectedFullScreenIndex?.let { fullScreenPagerState.scrollToPage(it) }
+            }
 
-                    item {
-                        Spacer(Modifier.height(120.dp))
-                    }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .clickable { selectedFullScreenIndex = null },
+                contentAlignment = Alignment.Center
+            ) {
+                HorizontalPager(
+                    state = fullScreenPagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    NetworkImage(
+                        url = allImages[page],
+                        repository = viewModel.repository,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
+                if (allImages.size > 1) {
+                    PagerIndicator(
+                        pageCount = allImages.size,
+                        currentPage = fullScreenPagerState.currentPage,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 48.dp),
+                        activeColor = Color.White,
+                        inactiveColor = Color.White.copy(alpha = 0.3f)
+                    )
+                }
+
+                IconButton(
+                    onClick = { selectedFullScreenIndex = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 48.dp, end = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Close, null, tint = Color.White)
                 }
             }
         }
     }
 
-    // Диалог написания отзыва
     if (showReviewDialog) {
         AlertDialog(
             onDismissRequest = { showReviewDialog = false },
             title = { Text("Ваш отзыв") },
             text = {
                 Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                         repeat(5) { index ->
-                            val rating = index + 1
-                            IconButton(onClick = { userRating = rating }) {
-                                Icon(
-                                    imageVector = if (userRating >= rating) Icons.Default.Star else Icons.Default.StarBorder,
-                                    contentDescription = null,
-                                    tint = if (userRating >= rating) Color(0xFFFFB300) else Color.Gray
-                                )
+                            IconButton(onClick = { userRating = index + 1 }) {
+                                Icon(imageVector = if (userRating > index) Icons.Default.Star else Icons.Outlined.StarBorder, contentDescription = null, tint = if (userRating > index) Color(0xFFFFB300) else Color.Gray)
                             }
                         }
                     }
-                    OutlinedTextField(
-                        value = userComment,
-                        onValueChange = { userComment = it },
-                        modifier = Modifier.fillMaxWidth().height(120.dp),
-                        placeholder = { Text("Поделитесь впечатлениями...") }
-                    )
+                    OutlinedTextField(value = userComment, onValueChange = { userComment = it }, modifier = Modifier.fillMaxWidth().height(120.dp), placeholder = { Text("Поделитесь впечатлениями...") })
                 }
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.addReview(url, userRating, userComment)
-                        showReviewDialog = false
-                        userComment = ""
-                    },
-                    enabled = userComment.isNotBlank()
-                ) {
-                    Text("Отправить")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReviewDialog = false }) {
-                    Text("Отмена")
-                }
-            }
+            confirmButton = { Button(onClick = { viewModel.addReview(url, userRating, userComment); showReviewDialog = false; userComment = "" }, enabled = userComment.isNotBlank()) { Text("Отправить") } },
+            dismissButton = { TextButton(onClick = { showReviewDialog = false }) { Text("Отмена") } }
         )
+    }
+}
+
+@Composable
+fun PagerIndicator(
+    pageCount: Int,
+    currentPage: Int,
+    modifier: Modifier = Modifier,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(pageCount) { index ->
+            val color = if (currentPage == index) activeColor else inactiveColor
+            Box(
+                modifier = Modifier
+                    .size(if (currentPage == index) 10.dp else 8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+    }
+}
+
+@Composable
+fun InfoRow(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 
 @Composable
 fun ReviewCard(review: ReviewResponse) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = review.username,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = review.date,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(review.username, fontWeight = FontWeight.Bold)
+                Text(review.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
-            Row(modifier = Modifier.padding(vertical = 4.dp)) {
-                repeat(5) { index ->
-                    Icon(
-                        imageVector = if (review.rating > index) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (review.rating > index) Color(0xFFFFB300) else Color.Gray
-                    )
-                }
+            Row(Modifier.padding(vertical = 4.dp)) {
+                repeat(5) { i -> Icon(if (review.rating > i) Icons.Default.Star else Icons.Outlined.StarBorder, null, Modifier.size(14.dp), tint = if (review.rating > i) Color(0xFFFFB300) else Color.Gray) }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = review.comment,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(review.comment, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-fun ActionButton(
-    icon: ImageVector,
-    label: String,
-    isActive: Boolean,
-    activeColor: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(8.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(28.dp)
-        )
+fun ActionButton(icon: ImageVector, label: String, isActive: Boolean, activeColor: Color, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onClick() }.padding(8.dp)) {
+        Icon(icon, label, tint = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(label, style = MaterialTheme.typography.labelSmall, color = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 fun CastMemberCard(castMember: CastMember, repository: AppRepository) {
-    ElevatedCard(
-        modifier = Modifier.width(160.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!castMember.imageUrl.isNullOrEmpty()) {
-                    NetworkImage(
-                        url = castMember.imageUrl,
-                        repository = repository,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(60.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = castMember.name,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                textAlign = TextAlign.Center,
-                minLines = 2,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = castMember.role,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 2,
-                textAlign = TextAlign.Center,
-                minLines = 2,
-                lineHeight = 14.sp
-            )
+    Column(modifier = Modifier.width(120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+            if (!castMember.imageUrl.isNullOrEmpty()) NetworkImage(castMember.imageUrl, repository, Modifier.fillMaxSize(), ContentScale.Crop)
+            else Icon(Icons.Default.Person, null, Modifier.size(50.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.outline)
         }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            castMember.name,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            castMember.role,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

@@ -19,14 +19,15 @@ class DiplomApp : Application(), ImageLoaderFactory {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface ImageLoaderEntryPoint {
-        fun okHttpClient(): OkHttpClient
+        @NetworkModule.ImageClient
+        fun imageOkHttpClient(): OkHttpClient
     }
 
     override fun newImageLoader(): ImageLoader {
         val okHttpClient = EntryPointAccessors.fromApplication(
             this,
             ImageLoaderEntryPoint::class.java
-        ).okHttpClient()
+        ).imageOkHttpClient()
 
         return ImageLoader.Builder(this)
             .okHttpClient(okHttpClient) // Используем наш настроенный клиент с лимитами

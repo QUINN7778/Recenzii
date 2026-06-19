@@ -52,21 +52,13 @@ fun PermissionsScreen(onBack: () -> Unit) {
         alarmManager.canScheduleExactAlarms()
     } else true
 
-    fun getStorageStatus() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        android.os.Environment.isExternalStorageManager()
-    } else {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-    }
-
     // Состояния инициализируются СРАЗУ актуальными значениями, чтобы не было "красной вспышки"
     var isNotifyGranted by remember { mutableStateOf(getNotifyStatus()) }
     var isAlarmGranted by remember { mutableStateOf(getAlarmStatus()) }
-    var isStorageGranted by remember { mutableStateOf(getStorageStatus()) }
 
     fun checkPermissions() {
         isNotifyGranted = getNotifyStatus()
         isAlarmGranted = getAlarmStatus()
-        isStorageGranted = getStorageStatus()
     }
 
     // Автоматическая проверка при каждом возврате в приложение
@@ -84,7 +76,6 @@ fun PermissionsScreen(onBack: () -> Unit) {
 
     // Лаунчеры для запросов
     val notifyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { checkPermissions() }
-    val storageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { checkPermissions() }
 
     Scaffold(
         topBar = {
@@ -150,33 +141,6 @@ fun PermissionsScreen(onBack: () -> Unit) {
                         context.startActivity(intent)
                     } else {
                         android.widget.Toast.makeText(context, "Разрешено системой", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-
-            // 3. Загрузка билетов
-            PermissionBlock(
-                title = "Доступ к памяти",
-                description = "Необходим для сохранения электронных билетов в папку 'Загрузки'.",
-                icon = Icons.Default.Download,
-                isGranted = isStorageGranted,
-                activeBrush = Brush.linearGradient(listOf(Color(0xFF00BCD4), Color(0xFF0097A7))),
-                inactiveBrush = Brush.linearGradient(listOf(Color(0xFFFF9800), Color(0xFFF57C00))),
-                onAction = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        try {
-                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                            context.startActivity(intent)
-                        }
-                    } else if (Build.VERSION.SDK_INT <= 28) {
-                        storageLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    } else {
-                        openSettings(context)
                     }
                 }
             )

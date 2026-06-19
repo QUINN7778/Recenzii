@@ -14,7 +14,6 @@ class NotificationHelper(private val context: Context) {
 
     companion object {
         const val REMINDER_CHANNEL_ID = "performance_reminders"
-        const val DOWNLOAD_CHANNEL_ID = "ticket_downloads"
     }
 
     init {
@@ -31,17 +30,8 @@ class NotificationHelper(private val context: Context) {
                 description = "Уведомления за 1 день, 12 часов и 3 часа до начала"
             }
 
-            val downloadChannel = NotificationChannel(
-                DOWNLOAD_CHANNEL_ID,
-                "Загрузки",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Статус загрузки билетов"
-            }
-
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(reminderChannel)
-            manager.createNotificationChannel(downloadChannel)
         }
     }
 

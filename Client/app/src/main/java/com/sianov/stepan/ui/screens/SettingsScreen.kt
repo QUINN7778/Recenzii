@@ -27,20 +27,28 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToPermissions: () -> Unit,
+    onNavigateToAppearance: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState(initial = false)
-    val fontSizeMultiplier by viewModel.fontSizeMultiplier.collectAsState(initial = 1.0f)
-    val themeColorIndex by viewModel.themeColorIndex.collectAsState(initial = 0)
-    val dynamicColor by viewModel.dynamicColor.collectAsState(initial = false)
     val user by authViewModel.user.collectAsState()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
     val context = LocalContext.current
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Настройки") }) }
+        topBar = { 
+            TopAppBar(
+                title = { 
+                    Text(
+                        text = "Настройки",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    ) 
+                }
+            ) 
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -69,58 +77,28 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Оформление
+            // 2. Оформление (Task 5)
             SettingsSection("Оформление")
-            Card(shape = cardShape, modifier = cardModifier) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.BrightnessMedium, null)
-                        Spacer(Modifier.width(16.dp))
-                        Text("Тёмная тема", Modifier.weight(1f))
-                        Switch(checked = isDarkTheme ?: false, onCheckedChange = { viewModel.setDarkTheme(it) })
+            Card(
+                shape = cardShape, 
+                modifier = cardModifier.clickable { onNavigateToAppearance() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp), 
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Palette, null)
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text("Внешний вид", fontWeight = FontWeight.Bold)
+                        Text("Тема, цвета, размер шрифта", style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Palette, null)
-                        Spacer(Modifier.width(16.dp))
-                        Text("Динамические цвета", Modifier.weight(1f))
-                        Switch(
-                            checked = dynamicColor, 
-                            onCheckedChange = { enabled ->
-                                if (enabled && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
-                                    // Можно добавить Toast
-                                } else {
-                                    viewModel.setDynamicColor(enabled)
-                                }
-                            }
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Text("Размер шрифта: ${(fontSizeMultiplier * 100).toInt()}%")
-                    Slider(value = fontSizeMultiplier, onValueChange = { viewModel.setFontSize(it) }, valueRange = 0.8f..1.4f, steps = 5)
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.ChevronRight, null)
                 }
             }
 
-            // 3. Цветовой стиль
-            if (!dynamicColor) {
-                SettingsSection("Цветовой стиль")
-                Card(shape = cardShape, modifier = cardModifier) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        val themes = listOf("Стандарт", "Театральный", "Океан", "Лесной", "Минимализм")
-                        themes.forEachIndexed { index, name ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().clickable { viewModel.setThemeColor(index) }.padding(8.dp)
-                            ) {
-                                RadioButton(selected = themeColorIndex == index, onClick = { viewModel.setThemeColor(index) })
-                                Text(name)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 4. Безопасность (ВОТ ОНА!)
+            // 3. Безопасность
             SettingsSection("Безопасность")
             Card(
                 shape = cardShape, 
@@ -141,7 +119,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. О приложении
+            // 4. О приложении
             SettingsSection("Приложение")
             Card(
                 shape = cardShape, 
@@ -155,7 +133,7 @@ fun SettingsScreen(
                     Spacer(Modifier.width(16.dp))
                     Column {
                         Text("О приложении", fontWeight = FontWeight.Bold)
-                        Text("Версия 1.2.0 (Stable)", style = MaterialTheme.typography.bodySmall)
+                        Text("Версия 1.0.1.", style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.weight(1f))
                     Icon(Icons.Default.ChevronRight, null)

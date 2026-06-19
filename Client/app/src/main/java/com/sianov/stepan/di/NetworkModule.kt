@@ -12,20 +12,29 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    @Qualifier
+    @Retention(AnnotationRetention.BINARY)
+    annotation class ApiClient
+
+    @Qualifier
+    @Retention(AnnotationRetention.BINARY)
+    annotation class ImageClient
+
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    @ApiClient
+    fun provideApiOkHttpClient(): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS // Уменьшил уровень логов для скорости
+            level = HttpLoggingInterceptor.Level.HEADERS
         }
 
-        // Увеличиваем лимиты на одновременные запросы (стабильные значения)
         val dispatcher = Dispatcher().apply {
             maxRequests = 32
             maxRequestsPerHost = 16
@@ -45,15 +54,31 @@ object NetworkModule {
             .addInterceptor(logging)
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
             .hostnameVerifier { _, _ -> true }
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS) // Длинный таймаут для пробуждения сервера
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    @ImageClient
+    fun provideImageOkHttpClient(): OkHttpClient {
+        val dispatcher = Dispatcher().apply {
+            maxRequests = 40
+            maxRequestsPerHost = 20
+        }
+
+        return OkHttpClient.Builder()
+            .dispatcher(dispatcher)
+            .connectTimeout(10, TimeUnit.SECONDS) // Быстрый таймаут для картинок
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(@ApiClient okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl("https://recenzii.onrender.com")
             .client(okHttpClient)

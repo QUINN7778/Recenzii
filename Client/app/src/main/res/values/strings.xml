@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Diplom</string>
+    <string name="app_name">IvMuz</string>
     <string name="screen_posters">Афиша</string>
     <string name="screen_my_theatre">Мой театр</string>
     <string name="screen_news">Новости</string>
@@ -35,4 +35,5 @@
     <string name="error_loading_detail">Не удалось загрузить детали спектакля. Проверьте интернет или попробуйте позже.</string>
     <string name="retry">Попробовать снова</string>
     <string name="error_site_unavailable">Сайт театра временно недоступен (502/504). Пожалуйста, попробуйте позже.</string>
+    <string name="error_posters_empty">Афиша пуста. Проверьте интернет или попробуйте позже.</string>
 </resources>

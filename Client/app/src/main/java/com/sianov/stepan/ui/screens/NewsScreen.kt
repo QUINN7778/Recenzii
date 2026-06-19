@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.sianov.stepan.R
@@ -34,7 +35,13 @@ fun NewsScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.screen_news)) },
+                    title = { 
+                        Text(
+                            text = stringResource(R.string.screen_news),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        ) 
+                    },
                     actions = {
                         IconButton(onClick = { viewModel.loadNews() }) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.retry))
@@ -96,6 +103,7 @@ fun NewsScreen(
                     AppItemCard(
                         item = newsItem,
                         repository = viewModel.repository,
+                        isPoster = false,
                         onClick = { onNewsClick(newsItem) }
                     )
                 }

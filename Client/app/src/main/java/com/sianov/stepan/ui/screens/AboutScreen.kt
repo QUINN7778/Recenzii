@@ -12,10 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -56,36 +56,31 @@ fun AboutScreen(onBack: () -> Unit) {
             TechBlock(
                 title = "Frontend / UI",
                 description = "Kotlin & Jetpack Compose, Material Design 3",
-                icon = Icons.Default.Smartphone,
-                gradient = Brush.linearGradient(listOf(Color(0xFF6200EE), Color(0xFF3700B3)))
+                icon = Icons.Default.Smartphone
             )
 
             TechBlock(
                 title = "Архитектура & DI",
                 description = "MVVM, Hilt, StateFlow, Navigation Compose",
-                icon = Icons.Default.Architecture,
-                gradient = Brush.linearGradient(listOf(Color(0xFF03DAC6), Color(0xFF018786)))
+                icon = Icons.Default.Architecture
             )
 
             TechBlock(
                 title = "Данные & Сеть",
                 description = "Retrofit, OkHttp, Room, DataStore, Jsoup",
-                icon = Icons.Default.Storage,
-                gradient = Brush.linearGradient(listOf(Color(0xFFFFB300), Color(0xFFFFA000)))
+                icon = Icons.Default.Storage
             )
 
             TechBlock(
                 title = "Backend (API)",
                 description = "Python & Django, BeautifulSoup4",
-                icon = Icons.Default.Cloud,
-                gradient = Brush.linearGradient(listOf(Color(0xFF4CAF50), Color(0xFF388E3C)))
+                icon = Icons.Default.Cloud
             )
 
             TechBlock(
                 title = "Функционал",
-                description = "Уведомления, Скачивание билетов, Скрапинг афиши",
-                icon = Icons.Default.Extension,
-                gradient = Brush.linearGradient(listOf(Color(0xFFE91E63), Color(0xFFC2185B)))
+                description = "Уведомления, Скрапинг афиши",
+                icon = Icons.Default.Extension
             )
 
             Spacer(Modifier.height(24.dp))
@@ -95,6 +90,17 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.outline,
                 lineHeight = 20.sp
             )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                text = "Версия 1.0.1",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+            
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -117,7 +123,12 @@ fun AuthorBlock() {
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(
+                    Icons.Default.Person,
+                    null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
             }
             Spacer(Modifier.width(20.dp))
             Column {
@@ -137,32 +148,52 @@ fun AuthorBlock() {
 }
 
 @Composable
-fun TechBlock(title: String, description: String, icon: ImageVector, gradient: Brush) {
+fun TechBlock(
+    title: String,
+    description: String,
+    icon: ImageVector
+) {
     Card(
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(4.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Box(modifier = Modifier.background(gradient).fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
+                Icon(
+                    icon,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
         }
     }

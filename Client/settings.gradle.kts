@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Diplom"
+rootProject.name = "IvMuz"
 include(":app")

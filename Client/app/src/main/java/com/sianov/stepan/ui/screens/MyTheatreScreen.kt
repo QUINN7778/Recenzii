@@ -43,7 +43,13 @@ fun MyTheatreScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Мой театр", fontWeight = FontWeight.Bold) }
+                title = { 
+                    Text(
+                        text = "Мой театр",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    ) 
+                }
             )
         }
     ) { padding ->

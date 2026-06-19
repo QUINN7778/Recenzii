@@ -19,15 +19,75 @@ class PosterViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    val filteredPosters: StateFlow<List<AppItem>> = combine(_posters, _searchQuery) { posters, query ->
-        if (query.isEmpty()) {
-            posters
-        } else {
-            posters.filter { 
+    private val _selectedMonth = MutableStateFlow<String?>(null)
+    val selectedMonth: StateFlow<String?> = _selectedMonth
+
+    private val _selectedGenre = MutableStateFlow<String?>(null)
+    val selectedGenre: StateFlow<String?> = _selectedGenre
+
+    val genres = listOf("Мюзикл", "Оперетта", "Комедия", "Сказка", "Драма")
+
+    private val monthMap = mapOf(
+        "ЯНВАРЯ" to "Январь",
+        "ФЕВРАЛЯ" to "Февраль",
+        "МАРТА" to "Март",
+        "АПРЕЛЯ" to "Апрель",
+        "МАЯ" to "Май",
+        "ИЮНЯ" to "Июнь",
+        "ИЮЛЯ" to "Июль",
+        "АВГУСТА" to "Август",
+        "СЕНТЯБРЯ" to "Сентябрь",
+        "ОКТЯБРЯ" to "Октябрь",
+        "НОЯБРЯ" to "Ноябрь",
+        "ДЕКАБРЯ" to "Декабрь"
+    )
+
+    val availableMonths: StateFlow<List<String>> = _posters.map { posters ->
+        posters.mapNotNull { item ->
+            val parts = item.date.split(" ")
+            if (parts.size > 1) {
+                val genitiveMonth = parts[1].replace(",", "").uppercase()
+                monthMap[genitiveMonth] ?: genitiveMonth
+            } else null
+        }.distinct()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val filteredPosters: StateFlow<List<AppItem>> = combine(
+        _posters, _searchQuery, _selectedMonth, _selectedGenre
+    ) { posters, query, month, genre ->
+        var result = posters
+        
+        // 1. Поиск (по заголовку и описанию)
+        if (query.isNotEmpty()) {
+            result = result.filter { 
                 it.title.contains(query, ignoreCase = true) || 
                 it.description.contains(query, ignoreCase = true)
             }
         }
+        
+        // 2. Фильтр по месяцу (учитываем падежи)
+        if (month != null) {
+            // Находим исходный родительный падеж для поиска в строке даты
+            val genitiveSearch = monthMap.entries.find { it.value == month }?.key ?: month.uppercase()
+            result = result.filter { it.date.uppercase().contains(genitiveSearch) }
+        }
+        
+        // 3. Фильтр по жанру (максимально гибкий поиск)
+        if (genre != null) {
+            val searchGenre = genre.lowercase().trim()
+            result = result.filter { 
+                val title = it.title.lowercase()
+                val desc = it.description.lowercase()
+                
+                title.contains(searchGenre) || 
+                desc.contains(searchGenre) ||
+                // Дополнительные проверки для сложных слов
+                (searchGenre == "комедия" && (title.contains("комическ") || desc.contains("комическ"))) ||
+                (searchGenre == "мюзикл" && (title.contains("musical") || desc.contains("musical")))
+            }
+        }
+        
+        result
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isLoading = MutableStateFlow(false)
@@ -39,6 +99,14 @@ class PosterViewModel @Inject constructor(
 
     fun onSearchQueryChange(newQuery: String) {
         _searchQuery.value = newQuery
+    }
+
+    fun toggleMonth(month: String) {
+        _selectedMonth.value = if (_selectedMonth.value == month) null else month
+    }
+
+    fun toggleGenre(genre: String) {
+        _selectedGenre.value = if (_selectedGenre.value == genre) null else genre
     }
 
     fun loadPosters() {
