@@ -31,7 +31,7 @@ class AppRepository @Inject constructor(
             scraper.fetchPosters()
         }
 
-        // Сохраняем новые данные в БД
+        // Мержим новые данные в кэш (не удаляя старые — чтобы сохранить недавно прошедшие)
         if (sitePosters.isNotEmpty()) {
             val entities = sitePosters.map { 
                 AppItemEntity(
@@ -47,25 +47,21 @@ class AppRepository @Inject constructor(
             appItemDao.insertAll(entities)
         }
 
-        // Получаем всё из кэша
-        val cachedEntities = appItemDao.getAllItemsByTypeSync("poster")
-        
-        // Фильтруем: оставляем те, что есть на сайте + те, что закончились не более 3 дней назад
-        val result = cachedEntities.filter { cached ->
-            val isOnSite = sitePosters.any { it.detailUrl == cached.detailUrl }
+        // Загружаем всё из кэша и фильтруем
+        val allCached = appItemDao.getAllItemsByTypeSync("poster")
+        val kept = allCached.filter { cached ->
             val isRecentPast = DateUtils.isWithinLastThreeDays(cached.date)
-            val isFuture = !DateUtils.isPast(cached.date)
-            
-            isOnSite || isRecentPast || isFuture
+            val canParse = DateUtils.parsePerformanceDate(cached.date) != null
+            val isFuture = canParse && !DateUtils.isPast(cached.date)
+            isRecentPast || isFuture
         }
 
-        // Чистим БД от совсем старых записей
-        val toDelete = cachedEntities.filter { cached -> 
-            !result.any { it.id == cached.id } 
+        // Перезаписываем БД только отфильтрованными — старьё удалится надёжно
+        if (kept.size < allCached.size) {
+            appItemDao.updateAllByType("poster", kept)
         }
-        toDelete.forEach { appItemDao.deleteByUrl(it.detailUrl, "poster") }
 
-        return result.map { it.toAppItem() }
+        return kept.map { it.toAppItem() }
     }
 
     suspend fun getNews(): List<AppItem> {
@@ -91,10 +87,30 @@ class AppRepository @Inject constructor(
                     itemType = "news"
                 )
             }
-            appItemDao.insertAll(entities)
+            // Очищаем старые новости перед вставкой новых
+            appItemDao.updateAllByType("news", entities)
         }
 
-        return appItemDao.getAllItemsByTypeSync("news").map { it.toAppItem() }
+        val allNews = appItemDao.getAllItemsByTypeSync("news").map { it.toAppItem() }
+        
+        // Сортировка: самые новые первые
+        return allNews.sortedByDescending { item ->
+            val parts = item.date.lowercase().split(Regex("[\\s\\u00A0\\u2007\\u202F]+")).filter { it.isNotEmpty() }
+            if (parts.size >= 3) {
+                val day = parts[0].toIntOrNull() ?: 1
+                val monthName = parts[1].trim()
+                val year = parts[2].toIntOrNull() ?: 2026
+                val months = mapOf(
+                    "января" to 1, "февраля" to 2, "марта" to 3, "апреля" to 4,
+                    "мая" to 5, "июня" to 6, "июля" to 7, "августа" to 8,
+                    "сентября" to 9, "октября" to 10, "ноября" to 11, "декабря" to 12
+                )
+                val month = months[monthName] ?: 1
+                "%04d%02d%02d".format(year, month, day) 
+            } else {
+                "0"
+            }
+        }
     }
 
     suspend fun getImageBytes(url: String): ByteArray? = scraper.getImageBytes(url)
@@ -106,8 +122,25 @@ class AppRepository @Inject constructor(
     
     suspend fun getPerformanceDetail(url: String): PerformanceDetail? {
         performanceCache[url]?.let { return it }
-        val detail = scraper.fetchPerformanceDetail(url)
+        var detail = scraper.fetchPerformanceDetail(url)
         if (detail != null) {
+            // Если у спектакля нет изображения на детальной странице, попробуем взять его из сохраненной афиши/новостей в БД
+            if (detail.imageUrl.isEmpty() && detail.galleryImages.isEmpty()) {
+                val cleanUrl = url.replace("https://www.ivmuz.ru", "").replace("http://www.ivmuz.ru", "")
+                val dbItem = appItemDao.getAllItemsByTypeSync("poster").find { 
+                    val cleanDbUrl = it.detailUrl.replace("https://www.ivmuz.ru", "").replace("http://www.ivmuz.ru", "")
+                    cleanDbUrl.isNotEmpty() && (cleanDbUrl == cleanUrl || cleanDbUrl.contains(cleanUrl) || cleanUrl.contains(cleanDbUrl))
+                } ?: appItemDao.getAllItemsByTypeSync("news").find {
+                    val cleanDbUrl = it.detailUrl.replace("https://www.ivmuz.ru", "").replace("http://www.ivmuz.ru", "")
+                    cleanDbUrl.isNotEmpty() && (cleanDbUrl == cleanUrl || cleanDbUrl.contains(cleanUrl) || cleanUrl.contains(cleanDbUrl))
+                }
+                if (dbItem != null && dbItem.imageUrl.isNotEmpty()) {
+                    detail = detail.copy(
+                        imageUrl = dbItem.imageUrl,
+                        galleryImages = listOf(dbItem.imageUrl)
+                    )
+                }
+            }
             performanceCache[url] = detail
         }
         return detail

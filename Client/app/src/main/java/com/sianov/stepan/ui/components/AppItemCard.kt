@@ -60,6 +60,26 @@ fun AppItemCard(
                         )
                     }
                 }
+
+                val isNew = isPoster && (
+                    item.title.contains("Ромео и Джульетта", ignoreCase = true) ||
+                    item.title.contains("Каприз Императрицы", ignoreCase = true)
+                )
+                if (isNew) {
+                    Surface(
+                        color = Color(0xFF2E7D32).copy(alpha = 0.8f),
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(bottomStart = 12.dp),
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            text = "НОВИНКА",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(

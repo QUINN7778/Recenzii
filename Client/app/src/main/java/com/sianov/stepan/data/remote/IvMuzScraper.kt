@@ -383,7 +383,42 @@ class IvMuzScraper @Inject constructor() {
                     items.add(AppItem(title, "", date, img, url))
                 }
             }
-            return@withContext items
+            
+            // Фильтр устаревших/битых новостей
+            val filteredItems = items.filter { 
+                !it.title.contains("Замена спектакля", ignoreCase = true) &&
+                !it.title.contains("Таврида открывает регестрицию", ignoreCase = true) &&
+                !it.title.contains("Семь лет вместе с нами", ignoreCase = true)
+            }
+            
+            // Сортировка новостей: самые новые первые.
+            // Используем корректный разбор даты.
+            return@withContext filteredItems.sortedBy { item ->
+                val parts = item.date.lowercase().split(Regex("[\\s\\u00A0\\u2007\\u202F]+")).filter { it.isNotEmpty() }
+                if (parts.size >= 2) {
+                    val day = parts[0].toIntOrNull() ?: 1
+                    val monthName = parts[1].replace(",", "").trim()
+                    val months = mapOf(
+                        "января" to 1, "январь" to 1,
+                        "февраля" to 2, "февраль" to 2,
+                        "марта" to 3, "март" to 3,
+                        "апреля" to 4, "апрель" to 4,
+                        "мая" to 5, "май" to 5,
+                        "июня" to 6, "июнь" to 6,
+                        "июля" to 7, "июль" to 7,
+                        "августа" to 8, "август" to 8,
+                        "сентября" to 9, "сентябрь" to 9,
+                        "октября" to 10, "октябрь" to 10,
+                        "ноября" to 11, "ноябрь" to 11,
+                        "декабря" to 12, "декабрь" to 12
+                    )
+                    val month = months[monthName] ?: 1
+                    // Используем отрицательное число для сортировки по возрастанию (но фактически по убыванию дат)
+                    -(2026 * 10000 + month * 100 + day)
+                } else {
+                    0
+                }
+            }
         } catch (e: Exception) { emptyList() }
     }
 

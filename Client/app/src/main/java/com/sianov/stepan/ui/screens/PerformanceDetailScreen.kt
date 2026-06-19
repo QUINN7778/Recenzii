@@ -176,6 +176,24 @@ fun PerformanceDetailScreen(
                                         )
                                     )
                                 )
+
+                                val isNew = performance.title.contains("Ромео и Джульетта", ignoreCase = true) ||
+                                            performance.title.contains("Каприз Императрицы", ignoreCase = true)
+                                if (isNew) {
+                                    Surface(
+                                        color = Color(0xFF2E7D32).copy(alpha = 0.8f),
+                                        contentColor = Color.White,
+                                        shape = RoundedCornerShape(bottomStart = 12.dp),
+                                        modifier = Modifier.align(Alignment.TopEnd)
+                                    ) {
+                                        Text(
+                                            text = "НОВИНКА",
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
 
                             Column(Modifier.padding(16.dp)) {
@@ -302,6 +320,13 @@ fun PerformanceDetailScreen(
                                     ) {
                                         items(performance.cast) { actor -> CastMemberCard(actor, viewModel.repository) }
                                     }
+                                } else {
+                                    Text(
+                                        text = "Отсутствует информация",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontStyle = FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
                                 }
                                 
                                 // ОТЗЫВЫ

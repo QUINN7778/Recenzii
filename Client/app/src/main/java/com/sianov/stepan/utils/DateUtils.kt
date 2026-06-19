@@ -8,9 +8,18 @@ import java.util.*
 
 object DateUtils {
     private val months = mapOf(
-        "января" to 1, "февраля" to 2, "марта" to 3, "апреля" to 4,
-        "мая" to 5, "июня" to 6, "июля" to 7, "августа" to 8,
-        "сентября" to 9, "октября" to 10, "ноября" to 11, "декабря" to 12
+        "января" to 1, "январь" to 1,
+        "февраля" to 2, "февраль" to 2,
+        "марта" to 3, "март" to 3,
+        "апреля" to 4, "апрель" to 4,
+        "мая" to 5, "май" to 5,
+        "июня" to 6, "июнь" to 6,
+        "июля" to 7, "июль" to 7,
+        "августа" to 8, "август" to 8,
+        "сентября" to 9, "сентябрь" to 9,
+        "октября" to 10, "октябрь" to 10,
+        "ноября" to 11, "ноябрь" to 11,
+        "декабря" to 12, "декабрь" to 12
     )
 
     /**
@@ -18,7 +27,7 @@ object DateUtils {
      */
     fun parsePerformanceDate(dateStr: String): LocalDateTime? {
         try {
-            val parts = dateStr.lowercase().split(" ")
+            val parts = dateStr.lowercase().split(Regex("[\\s\\u00A0\\u2007\\u202F]+")).filter { it.isNotEmpty() }
             if (parts.size < 2) return null
 
             val day = parts[0].toIntOrNull() ?: return null
